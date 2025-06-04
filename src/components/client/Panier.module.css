@@ -1,0 +1,168 @@
+.container {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 0 15px;
+  font-family: Arial, sans-serif;
+  color: #222; /* un noir doux */
+  background-color: #f5f5f5; /* gris clair en fond général */
+}
+
+.mainContent {
+  background-color: #fafafa; /* très clair, presque blanc */
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: #333; /* gris foncé pour le texte */
+  text-align: center;
+}
+
+.cartTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cartTable th,
+.cartTable td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #ccc; /* gris moyen */
+  text-align: center;
+  vertical-align: middle;
+}
+
+.cartTable thead {
+  background-color: #f1c40f; /* jaune vif */
+  color: #222; /* noir doux pour texte */
+}
+
+.cartTable tbody tr:hover {
+  background-color: #eaeaea; /* gris très clair au survol */
+}
+
+.qtyInput {
+  width: 60px;
+  padding: 6px;
+  font-size: 1rem;
+  border: 1px solid #999; /* gris */
+  border-radius: 4px;
+  text-align: center;
+  color: #222;
+  background-color: #fffbe6; /* jaune très clair en fond */
+}
+
+.removeButton {
+  background-color: #222; /* noir */
+  border: none;
+  color: #f1c40f; /* jaune */
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-left: 5px;
+  font-weight: bold;
+}
+
+.removeButton:hover {
+  background-color: #444; /* gris foncé au hover */
+  color: #fffbe6; /* jaune clair */
+}
+
+.modifyButton {
+  background-color: #f1c40f; /* jaune */
+  border: none;
+  color: #222; /* noir */
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-left: 5px;
+  font-weight: bold;
+}
+
+.modifyButton:hover {
+  background-color: #d4ac0d; /* jaune un peu plus foncé */
+  color: #111;
+}
+
+.totalLabel {
+  font-weight: bold;
+  text-align: right;
+  font-size: 1.1rem;
+  padding-right: 10px;
+  color: #222;
+}
+
+.totalPrice {
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #f1c40f; /* jaune */
+}
+
+.orderButton {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin: 30px auto 0 auto;
+  background-color: #222; /* noir */
+  color: #f1c40f; /* jaune */
+  border: none;
+  padding: 15px 0;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  text-align: center;
+}
+
+.orderButton:hover {
+  background-color: #444; /* gris foncé */
+  color: #fffbe6; /* jaune clair */
+}
+
+@media (max-width: 600px) {
+  .cartTable, .cartTable thead, .cartTable tbody, .cartTable th, .cartTable td, .cartTable tr {
+    display: block;
+  }
+
+  .cartTable tr {
+    margin-bottom: 15px;
+    border-bottom: 2px solid #ccc;
+  }
+
+  .cartTable td {
+    text-align: right;
+    padding-left: 50%;
+    position: relative;
+    color: #222;
+  }
+
+  .cartTable td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 15px;
+    width: 45%;
+    padding-left: 15px;
+    font-weight: bold;
+    text-align: left;
+    color: #222;
+  }
+
+  .qtyInput {
+    width: 100%;
+    background-color: #fffbe6;
+  }
+
+  .removeButton,
+  .modifyButton {
+    width: 100%;
+    margin: 8px 0 0 0;
+  }
+
+  .orderButton {
+    max-width: 100%;
+  }
+}

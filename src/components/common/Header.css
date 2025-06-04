@@ -1,0 +1,12 @@
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: #000;
+    z-index: 1000; /* pour qu'il reste au-dessus */
+  }
+  main {
+    margin-top: 80px; /* espace sous le header fixe */
+  }
+  

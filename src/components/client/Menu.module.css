@@ -1,0 +1,542 @@
+/* src/components/client/Menu.module.css */
+
+/* Global container for table selection screen */
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #FFF8F0;
+  font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Main menu container */
+.menuContainer {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #FFF8F0;
+  font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Table selection card */
+.tableSelectionCard {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(93, 64, 55, 0.15);
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.tableSelectionCard:hover {
+  transform: translateY(-2px);
+}
+
+/* Title for table selection and sections */
+.title,
+.sectionTitle {
+  color: #5D4037;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 30px;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* Table input */
+.tableInput {
+  border: 2px solid #D7CCC8;
+  border-radius: 12px;
+  padding: 15px 20px;
+  font-size: 1.25rem;
+  width: 100%;
+  margin-bottom: 25px;
+  text-align: center;
+  color: #3E2723;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.tableInput:focus {
+  border-color: #FF9800;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+}
+
+/* Confirm button */
+.confirmButton {
+  background-color: #5D4037;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  padding: 15px 40px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s, box-shadow 0.3s;
+}
+
+.confirmButton:hover {
+  background-color: #3E2723;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(93, 64, 55, 0.3);
+}
+
+.confirmButton:focus {
+  outline: 3px solid rgba(255, 152, 0, 0.5);
+  outline-offset: 2px;
+}
+
+/* Category and menu sections */
+.categorySection,
+.menuSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Search input */
+.searchInput {
+  border: 2px solid #D7CCC8;
+  border-radius: 30px;
+  padding: 14px 24px;
+  font-size: 1.1rem;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 30px;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.searchInput:focus {
+  border-color: #FF9800;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+}
+
+/* Category grid */
+.categoryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 24px;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Category card */
+.categoryCard {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 20px 15px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.categoryCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(93, 64, 55, 0.2);
+}
+
+.categoryCard:focus {
+  outline: 3px solid #FF9800;
+  outline-offset: 2px;
+}
+
+/* Category image wrapper */
+.categoryImageWrapper {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto 15px;
+  border: 3px solid #FFF8F0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Category image */
+.categoryImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Category name */
+.categoryName {
+  color: #5D4037;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: block;
+}
+
+/* Category header */
+.categoryHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30px;
+  gap: 15px;
+}
+
+/* Back button */
+.backButton {
+  background-color: #757575;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+  display: flex;
+  align-items: center;
+}
+
+.backButton:hover {
+  background-color: #5D4037;
+  transform: translateX(-2px);
+}
+
+.backButton:focus {
+  outline: 3px solid #FF9800;
+  outline-offset: 2px;
+}
+
+/* Category title */
+.categoryTitle {
+  color: #FF9800;
+  font-size: 1.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Menu grid */
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 32px;
+  width: 100%;
+}
+
+/* Menu item card */
+.menuItemCard {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(93, 64, 55, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.menuItemCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 24px rgba(93, 64, 55, 0.15);
+}
+
+/* Menu item image container (larger cadre) */
+.itemImageContainer {
+  width: 100%;
+  height: 200px; /* Increased height for larger cadre */
+  overflow: hidden;
+  cursor: pointer;
+  background-color: #F5F5F5; /* Light background for empty space */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Menu item image */
+.itemImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain; /* Show entire image without cropping */
+  transition: transform 0.3s ease;
+}
+
+.itemImage:hover {
+  transform: scale(1.05);
+}
+
+/* Menu item details */
+.itemDetails {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+/* Menu item name */
+.itemName {
+  color: #5D4037;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* Menu item description */
+.itemDescription {
+  color: #757575;
+  font-size: 1rem;
+  flex-grow: 1;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+/* Menu item footer */
+.itemFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Menu item price */
+.itemPrice {
+  color: #5D4037;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+/* Add to cart button */
+.addToCartButton {
+  background-color: #5D4037;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.addToCartButton:hover {
+  background-color: #FF9800;
+  transform: translateY(-1px);
+}
+
+.addToCartButton:focus {
+  outline: 3px solid #FF9800;
+  outline-offset: 2px;
+}
+
+/* Loading indicator */
+.loadingIndicator {
+  text-align: center;
+  color: #5D4037;
+  font-size: 1.3rem;
+  padding: 40px;
+  font-weight: 500;
+}
+
+/* Empty message */
+.emptyMessage {
+  text-align: center;
+  color: #757575;
+  font-size: 1.2rem;
+  padding: 40px;
+  grid-column: 1 / -1;
+}
+
+/* Image modal */
+.imageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Modal content */
+.modalContent {
+  position: relative;
+  max-width: 90%;
+  max-height: 90vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: scale(0.8);
+  animation: scaleIn 0.3s ease forwards;
+}
+
+/* Modal image */
+.modalImage {
+  width: 600px;
+  height: 300px;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  background-color: #FFFFFF;
+}
+
+/* Close modal button */
+.closeModalButton {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  background: #D32F2F;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.closeModalButton:hover {
+  background: #B71C1C;
+  transform: scale(1.1);
+}
+
+.closeModalButton:focus {
+  outline: 3px solid #FF9800;
+  outline-offset: 2px;
+}
+
+/* Reset button container */
+.resetButtonContainer {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+/* Reset button */
+.resetButton {
+  background-color: #757575;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 30px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.resetButton:hover {
+  background-color: #5D4037;
+  transform: translateY(-2px);
+}
+
+.resetButton:focus {
+  outline: 3px solid #FF9800;
+  outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .categoryGrid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .menuGrid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  .modalImage {
+    width: 500px;
+    height: 250px;
+  }
+  .itemImageContainer {
+    height: 180px; /* Slightly smaller cadre for tablets */
+  }
+}
+
+@media (max-width: 768px) {
+  .container,
+  .menuContainer {
+    padding: 10px;
+  }
+  .categoryGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
+  .menuGrid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .tableSelectionCard {
+    padding: 30px;
+  }
+  .title,
+  .sectionTitle {
+    font-size: 1.8rem;
+  }
+  .categoryTitle {
+    font-size: 1.6rem;
+  }
+  .modalImage {
+    width: 90vw;
+    height: auto;
+    max-height: 60vh;
+  }
+  .itemImageContainer {
+    height: 160px; /* Adjusted for mobile */
+  }
+}
+
+@media (max-width: 480px) {
+  .tableInput,
+  .confirmButton,
+  .searchInput,
+  .backButton,
+  .addToCartButton,
+  .resetButton {
+    font-size: 0.9rem;
+    padding: 10px 16px;
+  }
+  .itemName {
+    font-size: 1.2rem;
+  }
+  .itemPrice {
+    font-size: 1.2rem;
+  }
+  .categoryImageWrapper {
+    width: 80px;
+    height: 80px;
+  }
+  .categoryName {
+    font-size: 1rem;
+  }
+  .itemImageContainer {
+    height: 140px; /* Further adjusted for small screens */
+  }
+}
