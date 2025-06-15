@@ -16,7 +16,7 @@ export default function GestionMenu() {
   const [loading, setLoading] = useState(true);
 
   // ─── POINT ALL REQUESTS HERE ─────────────────────────────────────────────────────
-  const API_URL = 'https://back-end-digi-food-fn5i.vercel.app/api/menu';
+  const API_URL = 'https://backendmenu-3.onrender.com';
 
   useEffect(() => {
     const fetchMenu = async () => {

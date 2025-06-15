@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   // No trailing slash here
-  baseURL: 'https://back-end-digi-food-fn5i.vercel.app'
+  baseURL: 'https://backendmenu-3.onrender.com'
 });
 
 export const getMenu = () => api.get('/api/menu');

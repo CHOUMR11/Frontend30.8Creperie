@@ -21,7 +21,7 @@ import frappuccinoImage from '../../assets/Frappucino.jpg';
 import smoothieImage from '../../assets/Smoothie.jpg';
 import jwajemImage from '../../assets/Jwajem.jpg';
 import waffleImage from '../../assets/Gauffre.jpg';
-import sweetCrepeImage from '../../assets/crepe-scuréé.jpg'; // Corrected filename
+import sweetCrepeImage from '../../assets/crepe-scuréé.jpg';
 import cheesecakeImage from '../../assets/Cheescake.jpg';
 import pancakeImage from '../../assets/pancake.jpg';
 import savoryCrepeImage from '../../assets/crepe-salé.jpg';
@@ -39,25 +39,17 @@ export default function Menu() {
    *  State management
    *  ───────────────────────────────────────────────────────────────────────
    */
-  const [tableNumber, setTableNumber] = useState(() =>
-    localStorage.getItem('tableNumber') || '0'
-  );
-  const [tableConfirmed, setTableConfirmed] = useState(() =>
-    localStorage.getItem('tableNumber') !== '0'
-  );
+  const [tableNumber, setTableNumber] = useState('');
+  const [tableConfirmed, setTableConfirmed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [menuItems, setMenuItems] = useState([]);
-  const [cart, setCart] = useState(() =>
-    JSON.parse(localStorage.getItem(`cart_${localStorage.getItem('tableNumber') || '0'}`)) || []
-  );
+  const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
-  const [selectedImage, setSelectedImage] = useState(null); // Pour la modale
+  const [selectedImage, setSelectedImage] = useState(null);
 
-  // navigation hook (pour rediriger vers /cart, etc.)
   const navigate = useNavigate();
 
-  // Schéma de couleurs (peut être utilisé dans le style inline ou ailleurs)
   const colors = {
     primary: '#5D4037',
     secondary: '#D7CCC8',
@@ -70,7 +62,6 @@ export default function Menu() {
     white: '#FFFFFF',
   };
 
-  // Catégories fixes + images associées
   const fixedCategories = [
     { name: 'Food', image: foodImage },
     { name: 'Boissons', image: drinksImage },
@@ -104,22 +95,24 @@ export default function Menu() {
    *  Effets ⇢ Initialisation / Persistance
    *  ───────────────────────────────────────────────────────────────────────
    */
-  // 1️⃣ Récupérer le numéro de table + panier depuis localStorage
+  // 1️⃣ Reset table number and cart on component mount to force table selection
   useEffect(() => {
-    const storedTableNumber = localStorage.getItem('tableNumber') || '0';
-    setTableNumber(storedTableNumber);
-    setTableConfirmed(storedTableNumber !== '0');
-    setCart(JSON.parse(localStorage.getItem(`cart_${storedTableNumber}`)) || []);
-  }, []);
+    // Clear localStorage and reset state to ensure table selection on every visit
+    localStorage.removeItem('tableNumber');
+    localStorage.removeItem('cart_0'); // Clear default cart
+    setTableNumber('');
+    setTableConfirmed(false);
+    setCart([]);
+  }, []); // Empty dependency array ensures this runs only on mount
 
-  // 2️⃣ Persister le panier dans localStorage dès que cart ou tableNumber change
+  // 2️⃣ Persist the cart in localStorage when cart or tableNumber changes
   useEffect(() => {
-    if (tableNumber !== '0') {
+    if (tableNumber !== '' && tableConfirmed) {
       localStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
     }
-  }, [cart, tableNumber]);
+  }, [cart, tableNumber, tableConfirmed]);
 
-  // 3️⃣ Récupérer le menu depuis le backend lorsque la table est confirmée
+  // 3️⃣ Fetch menu from backend when table is confirmed
   useEffect(() => {
     if (!tableConfirmed) return;
 
@@ -127,7 +120,6 @@ export default function Menu() {
     getMenu()
       .then((res) => {
         console.log('Menu API Response:', res);
-        // res.data doit être un array d’objets { _id, name, price, description, imageUrl, category, … }
         setMenuItems(res.data || []);
       })
       .catch((err) => {
@@ -140,7 +132,7 @@ export default function Menu() {
   }, [tableConfirmed]);
 
   /** ──────────────────────────────────────────────────────────────────────
-   *  Calcul du total du panier (memoisé pour éviter recalculs inutiles)
+   *  Calcul du total du panier
    *  ───────────────────────────────────────────────────────────────────────
    */
   const cartTotal = useMemo(() => {
@@ -151,7 +143,6 @@ export default function Menu() {
    *  Fonctions ⇢ Gestion du panier
    *  ───────────────────────────────────────────────────────────────────────
    */
-  // Ajouter un item au panier (ou incrémenter la quantité si déjà présent)
   const addToCart = useCallback((item) => {
     setCart((prev) => {
       const existing = prev.find((i) => i._id === item._id);
@@ -165,7 +156,6 @@ export default function Menu() {
     toast.success(`${item.name} ajouté au panier !`);
   }, []);
 
-  // Confirmer le numéro de table (bouton “Valider”)
   const confirmTable = useCallback(() => {
     if (!tableNumber.trim() || Number(tableNumber) <= 0) {
       toast.error('Veuillez saisir un numéro de table valide');
@@ -173,30 +163,25 @@ export default function Menu() {
     }
     setTableConfirmed(true);
     localStorage.setItem('tableNumber', tableNumber);
-    setCart(JSON.parse(localStorage.getItem(`cart_${tableNumber}`)) || []);
   }, [tableNumber]);
 
-  // Réinitialiser la table (bouton “Quitter la table”)
   const resetTable = useCallback(() => {
-    setTableNumber('0');
+    setTableNumber('');
     setTableConfirmed(false);
     setCart([]);
-    localStorage.setItem('tableNumber', '0');
-    localStorage.setItem(`cart_${tableNumber}`, JSON.stringify([]));
+    localStorage.removeItem('tableNumber');
+    localStorage.removeItem(`cart_${tableNumber}`);
     toast.info('Numéro de table réinitialisé.');
   }, [tableNumber]);
 
-  // Aller vers la page du panier (non utilisé pour l'instant, mais prêt)
   const goToCart = useCallback(() => {
     navigate('/cart');
   }, [navigate]);
 
-  // Ouvrir la modale d’image
   const handleImageClick = useCallback((imageUrl) => {
     setSelectedImage(imageUrl);
   }, []);
 
-  // Fermer la modale
   const closeModal = useCallback(() => {
     setSelectedImage(null);
   }, []);
@@ -205,19 +190,16 @@ export default function Menu() {
    *  Filtrage ⇢ Catégories & Items
    *  ───────────────────────────────────────────────────────────────────────
    */
-  // Filtrer dynamiquement la liste fixe de catégories
   const filteredCategories = useMemo(() => {
     return fixedCategories.filter((cat) =>
       cat.name.toLowerCase().includes(categorySearch.toLowerCase())
     );
   }, [categorySearch]);
 
-  // Une fois qu'une catégorie est sélectionnée, ne garder que les items de cette catégorie
   const filteredMenuItems = useMemo(() => {
     return menuItems.filter((item) => item.category === selectedCategory);
   }, [menuItems, selectedCategory]);
 
-  // Nombre total d’articles dans le panier
   const cartCount = cart.reduce((acc, cur) => acc + cur.quantity, 0);
 
   /** ──────────────────────────────────────────────────────────────────────
@@ -255,7 +237,7 @@ export default function Menu() {
   }
 
   /** ──────────────────────────────────────────────────────────────────────
-   *  Écran “Affichage du menu” (table confirmée)
+   *  Écran “Affichage du menu”
    *  ───────────────────────────────────────────────────────────────────────
    */
   return (
@@ -263,7 +245,6 @@ export default function Menu() {
       <Header tableNumber={tableNumber} cartCount={cartCount} />
 
       <main className={styles.mainContent}>
-        {/* Si aucune catégorie sélectionnée → afficher le carrousel de catégories */}
         {!selectedCategory ? (
           <div className={styles.categorySection}>
             <h3 className={styles.sectionTitle}>Choisissez une catégorie</h3>
@@ -304,7 +285,6 @@ export default function Menu() {
             )}
           </div>
         ) : (
-          /* Affichage des items pour la catégorie choisie */
           <div className={styles.menuSection}>
             <div className={styles.categoryHeader}>
               <button
@@ -328,23 +308,17 @@ export default function Menu() {
             ) : (
               <div className={styles.menuGrid}>
                 {filteredMenuItems.map((item) => {
-                  // Pour diagnostiquer l’URL d’image
                   console.log(`Item: ${item.name}, Image: ${item.imageUrl}`);
-
-                  // Gestion robuste de l'URL de l’image (soit absolue soit relative)
                   const getImageUrl = () => {
                     if (item.imageUrl && item.imageUrl.trim() !== '') {
-                      // Si c’est une URL complète, on l’utilise telle quelle
                       if (item.imageUrl.startsWith('http')) {
                         return item.imageUrl;
                       }
-                      // Sinon, on suppose que c’est un chemin relatif envoyé par le backend
-                      return `https://back-end-digi-food-fn5i.vercel.app/${item.imageUrl.replace(
+                      return `https://backendmenu-3.onrender.com${item.imageUrl.replace(
                         /^\/+/,
                         ''
                       )}`;
                     }
-                    // Si aucune image fournie, fallback aléatoire
                     return 'https://picsum.photos/200/100?random=2000';
                   };
 
@@ -397,7 +371,6 @@ export default function Menu() {
         )}
       </main>
 
-      {/* Modale pour agrandir l’image */}
       {selectedImage && (
         <div
           className={styles.imageModal}
@@ -429,7 +402,6 @@ export default function Menu() {
         </div>
       )}
 
-      {/* Bouton “Quitter la table” */}
       <div className={styles.resetButtonContainer}>
         <button
           type="button"
