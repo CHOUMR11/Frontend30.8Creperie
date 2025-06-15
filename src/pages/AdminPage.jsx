@@ -4,7 +4,7 @@ import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 
 import GestionMenu from '../components/admin/GestionMenu';
 import ListeCommandes from '../components/admin/ListeCommandes';
-import Impression from '../components/admin/Impression';
+
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ export default function AdminPage() {
         <Routes>
           <Route path="/menu" element={<GestionMenu />} />
           <Route path="/commandes" element={<ListeCommandes />} />
-          <Route path="/impression" element={<Impression />} />
+         
         </Routes>
       </div>
     </div>
