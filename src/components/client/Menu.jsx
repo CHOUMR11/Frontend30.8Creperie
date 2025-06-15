@@ -17,7 +17,7 @@ import boxImage from '../../assets/Box.jpg';
 import mojitoImage from '../../assets/Mojito.jpg';
 import juiceImage from '../../assets/Jus.jpg';
 import hotChocolateImage from '../../assets/Hot-Chocolate.jpg';
-import frappuccinoImage from '../../assets/Frappucino.jpg';
+import frappuccinoImage from '../../assets/frappucino.jpg';
 import smoothieImage from '../../assets/Smoothie.jpg';
 import jwajemImage from '../../assets/Jwajem.jpg';
 import waffleImage from '../../assets/Gauffre.jpg';
