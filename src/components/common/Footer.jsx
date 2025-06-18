@@ -24,7 +24,7 @@ export default function Footer() {
             <FaFacebookF />
           </a>
           <a
-            href="https://wa.me/+21623597726"
+            href="https://wa.me/21623597726"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="WhatsApp"
@@ -32,7 +32,9 @@ export default function Footer() {
             <FaWhatsapp />
           </a>
         </div>
-        <p className="footer-text">© 2025 Crêperie 30.8 - Tous droits réservés</p>
+        <p className="footer-text">
+          © {new Date().getFullYear()} Crêperie 30.8 - Tous droits réservés
+        </p>
       </div>
     </footer>
   );
