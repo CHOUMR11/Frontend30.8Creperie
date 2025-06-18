@@ -40,9 +40,7 @@ export default function AdminPage() {
         <Link to="/admin/commandes">
           <button style={buttonStyle}>📦 Liste des Commandes</button>
         </Link>
-        <Link to="/admin/impression">
-          <button style={buttonStyle}>🖨️ Impression</button>
-        </Link>
+        
       </div>
 
       <div style={{ marginTop: '3rem', padding: '1rem' }}>

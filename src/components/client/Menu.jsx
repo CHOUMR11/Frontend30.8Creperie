@@ -34,6 +34,11 @@ import frozenYogurtImage from '../../assets/yaourt-glacé.jpg';
 import iceCreamScoopImage from '../../assets/Glace-Boule.jpg';
 import iceCreamCupImage from '../../assets/Coupe-de-Glace.jpg';
 
+// Utility function to format currency as XX.XXX DT
+const formatCurrency = (amount) => {
+  return `${Number(amount).toFixed(3)} DT`;
+};
+
 export default function Menu() {
   /** ──────────────────────────────────────────────────────────────────────
    *  State management
@@ -175,7 +180,8 @@ export default function Menu() {
   }, [tableNumber]);
 
   const goToCart = useCallback(() => {
-    navigate('/cart');
+    console.log('Navigating to /client/panier');
+    navigate('/client/panier');
   }, [navigate]);
 
   const handleImageClick = useCallback((imageUrl) => {
@@ -257,7 +263,14 @@ export default function Menu() {
               aria-label="Rechercher une catégorie"
             />
             {loading ? (
-              <div className={styles.loadingIndicator}>Chargement...</div>
+              <div className={styles.loadingContainer}>
+                <div className={styles.spinner}>
+                  <span className={styles.dot}></span>
+                  <span className={styles.dot}></span>
+                  <span className={styles.dot}></span>
+                </div>
+                <span className={styles.loadingText}>Mise à jour des catégories...</span>
+              </div>
             ) : (
               <div className={styles.categoryGrid}>
                 {filteredCategories.length === 0 ? (
@@ -300,7 +313,14 @@ export default function Menu() {
             </div>
 
             {loading ? (
-              <div className={styles.loadingIndicator}>Chargement...</div>
+              <div className={styles.loadingContainer}>
+                <div className={styles.spinner}>
+                  <span className={styles.dot}></span>
+                  <span className={styles.dot}></span>
+                  <span className={styles.dot}></span>
+                </div>
+                <span className={styles.loadingText}>Mise à jour des articles...</span>
+              </div>
             ) : filteredMenuItems.length === 0 ? (
               <p className={styles.emptyMessage}>
                 Aucun article trouvé dans cette catégorie.
@@ -350,7 +370,7 @@ export default function Menu() {
                         </p>
                         <div className={styles.itemFooter}>
                           <span className={styles.itemPrice}>
-                            {item.price.toFixed(2)} DT
+                            {formatCurrency(item.price)}
                           </span>
                           <button
                             type="button"
@@ -370,6 +390,19 @@ export default function Menu() {
           </div>
         )}
       </main>
+
+      <div className={styles.floatingCartButton}>
+        <button
+          className={styles.cartButton}
+          onClick={goToCart}
+          aria-label={`Voir le panier avec ${cartCount} articles`}
+        >
+          <span className={styles.cartIcon}></span>
+          {cartCount > 0 && (
+            <span className={styles.cartBadge}>{cartCount}</span>
+          )}
+        </button>
+      </div>
 
       {selectedImage && (
         <div
