@@ -24,7 +24,7 @@ export default function Footer() {
             <FaFacebookF />
           </a>
           <a
-            href="https://wa.me/tonnumero"
+            href="https://wa.me/0021623597726"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="WhatsApp"
