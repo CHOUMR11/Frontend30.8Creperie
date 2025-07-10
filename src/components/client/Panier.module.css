@@ -166,3 +166,22 @@ h2 {
     max-width: 100%;
   }
 }
+.addOrderButton {
+  background-color: #28a745; /* Vert pour indiquer une action d'ajout */
+  color: white;
+  padding: 10px 20px;
+  margin-right: 10px; /* Espacement avec le bouton Nouvelle addition */
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.addOrderButton:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.addOrderButton:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}

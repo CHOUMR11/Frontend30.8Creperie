@@ -1,181 +1,201 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { FaArrowLeft } from 'react-icons/fa';
 import Header from '../common/Header';
 import Footer from '../common/Footer';
 import styles from './Panier.module.css';
 
 // Utility for generating UUIDs
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
 
-// Enhanced storage utility with session-based bill management
+// Advanced storage utility with validation and error handling
 const storage = {
-  get: (key) => {
+  get: key => {
     try {
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       console.error(`Error reading ${key} from localStorage:`, error);
+      toast.error('Erreur lors de la lecture des données.', { autoClose: 2000 });
       return null;
     }
   },
-  
   set: (key, value) => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
       console.error(`Error writing ${key} to localStorage:`, error);
-      toast.error('Erreur lors de la sauvegarde des données.');
+      toast.error('Erreur lors de la sauvegarde des données.', { autoClose: 2000 });
     }
   },
-  
-  getSessionBill: (tableNumber) => {
+  getSessionBill: tableNumber => {
     const sessionBills = storage.get('sessionBills') || {};
     return sessionBills[tableNumber] || null;
   },
-  
   setSessionBill: (tableNumber, billId) => {
     const sessionBills = storage.get('sessionBills') || {};
     sessionBills[tableNumber] = billId;
     storage.set('sessionBills', sessionBills);
     localStorage.setItem('currentBillId', billId);
   },
-  
   updateCart: (newCart, tableNumber) => {
     storage.set(`cart_${tableNumber}`, newCart);
+    console.log(`Panier mis à jour dans localStorage pour table ${tableNumber}:`, newCart);
   },
-  
-  getCart: (tableNumber) => {
-    return storage.get(`cart_${tableNumber}`) || [];
+  getCart: tableNumber => {
+    const cart = storage.get(`cart_${tableNumber}`) || [];
+    console.log(`Panier chargé depuis localStorage pour table ${tableNumber}:`, cart);
+    return cart;
   },
-  
-  updateBills: (newBills) => {
+  updateBills: newBills => {
     storage.set('bills', newBills);
+    console.log('Bills mis à jour dans localStorage:', newBills);
   },
-  
-  clearCart: (tableNumber) => {
+  clearCart: tableNumber => {
     storage.set(`cart_${tableNumber}`, []);
-  }
+    console.log(`Panier vidé pour table ${tableNumber}`);
+  },
+  clearBillData: tableNumber => {
+    const bills = storage.get('bills') || [];
+    const updatedBills = bills.filter(bill => bill.tableNumber !== tableNumber);
+    storage.set('bills', updatedBills);
+    const sessionBills = storage.get('sessionBills') || {};
+    delete sessionBills[tableNumber];
+    storage.set('sessionBills', sessionBills);
+    localStorage.removeItem('currentBillId');
+    localStorage.removeItem('tableNumber');
+    console.log(`Bill data and table number cleared for table ${tableNumber}`);
+  },
 };
 
 export default function Panier() {
-  const [tableNumber, setTableNumber] = useState(() => localStorage.getItem('tableNumber') || '0');
-  const [cart, setCart] = useState(() => storage.getCart(tableNumber));
+  const navigate = useNavigate();
+  const [tableNumber, setTableNumber] = useState(() => {
+    const num = localStorage.getItem('tableNumber') || '0';
+    console.log('Initial tableNumber:', num);
+    return num;
+  });
+  const [cart, setCart] = useState(() => {
+    const initialCart = storage.getCart(tableNumber);
+    console.log('Initial cart:', initialCart);
+    return initialCart;
+  });
   const [commandePassee, setCommandePassee] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Session-based bill management
-  const [bill, setBill] = useState(() => {
+  const [bill, setBill] = useState(null);
+  const quantityTimeoutRef = useRef(null);
+
+  // Initialize bill
+  const initializeBill = useCallback(() => {
     if (!tableNumber || tableNumber === '0') return null;
-    
     const sessionBillId = storage.getSessionBill(tableNumber);
     if (sessionBillId) {
       const bills = storage.get('bills') || [];
-      const existingBill = bills.find(bill => bill.id === sessionBillId);
-      if (existingBill) return existingBill;
+      const existingBill = bills.find(bill => bill.id === sessionBillId && bill.tableNumber === tableNumber);
+      if (existingBill) {
+        console.log('Bill existant chargé:', existingBill);
+        return existingBill;
+      }
     }
-    
     const newBillId = generateUUID();
-    const newBill = { 
-      id: newBillId, 
-      tableNumber, 
-      orders: [], 
-      totalBillAmount: 0 
+    const newBill = {
+      id: newBillId,
+      tableNumber,
+      orders: [],
+      totalBillAmount: 0,
     };
-    
     const updatedBills = [...(storage.get('bills') || []), newBill];
     storage.updateBills(updatedBills);
     storage.setSessionBill(tableNumber, newBillId);
-    
+    console.log('Nouveau bill créé:', newBill);
     return newBill;
-  });
+  }, [tableNumber]);
 
-  // Synchronize table number and reset cart/bill on mount
+  // Synchronize table number, cart, and bill
   useEffect(() => {
     const storedTableNumber = localStorage.getItem('tableNumber') || '0';
-    setTableNumber(storedTableNumber);
-    setCart(storage.getCart(storedTableNumber));
-    setCommandePassee(false);
-    
-    if (storedTableNumber !== '0') {
-      const sessionBillId = storage.getSessionBill(storedTableNumber);
-      if (sessionBillId) {
-        const bills = storage.get('bills') || [];
-        const currentBill = bills.find(bill => bill.id === sessionBillId);
-        if (currentBill) {
-          setBill(currentBill);
-        } else {
-          const newBillId = generateUUID();
-          const newBill = { 
-            id: newBillId, 
-            tableNumber: storedTableNumber, 
-            orders: [], 
-            totalBillAmount: 0 
-          };
-          const updatedBills = [...(storage.get('bills') || []), newBill];
-          storage.updateBills(updatedBills);
-          storage.setSessionBill(storedTableNumber, newBillId);
-          setBill(newBill);
-        }
+    console.log('Syncing tableNumber:', storedTableNumber);
+    if (storedTableNumber !== tableNumber) {
+      // Clear data for previous table if table number changes
+      if (tableNumber !== '0') {
+        storage.clearCart(tableNumber);
+        storage.clearBillData(tableNumber);
+      }
+      setTableNumber(storedTableNumber);
+      setCart([]);
+      setCommandePassee(false);
+      if (storedTableNumber !== '0') {
+        setBill(initializeBill());
       } else {
-        const newBillId = generateUUID();
-        const newBill = { 
-          id: newBillId, 
-          tableNumber: storedTableNumber, 
-          orders: [], 
-          totalBillAmount: 0 
-        };
-        const updatedBills = [...(storage.get('bills') || []), newBill];
-        storage.updateBills(updatedBills);
-        storage.setSessionBill(storedTableNumber, newBillId);
-        setBill(newBill);
+        setBill(null);
       }
     } else {
-      setBill(null);
-      setCart([]);
-      storage.clearCart(tableNumber);
+      const loadedCart = storage.getCart(storedTableNumber);
+      setCart(loadedCart);
+      setCommandePassee(false);
+      if (storedTableNumber !== '0') {
+        setBill(initializeBill());
+      } else {
+        setBill(null);
+        setCart([]);
+        storage.clearCart(tableNumber);
+      }
     }
-  }, []); // Run only once on mount
+  }, [tableNumber, initializeBill]);
 
-  // Save cart to localStorage on change
+  // Persist cart to localStorage
   useEffect(() => {
     if (tableNumber !== '0') {
       storage.updateCart(cart, tableNumber);
     }
   }, [cart, tableNumber]);
 
-  const removeFromCart = useCallback(
-    (id) => {
-      const newCart = cart.filter((item) => item._id !== id);
-      setCart(newCart);
-      toast.info('Article supprimé du panier', { autoClose: 2000 });
-      setCommandePassee(false);
+  // Debounced quantity update
+  const updateQuantity = useCallback(
+    (cartItemId, quantity) => {
+      if (quantity < 1 || isNaN(quantity) || !Number.isInteger(quantity)) {
+        toast.error('Quantité invalide.', { autoClose: 2000 });
+        return;
+      }
+      if (quantityTimeoutRef.current) {
+        clearTimeout(quantityTimeoutRef.current);
+      }
+      quantityTimeoutRef.current = setTimeout(() => {
+        setCart(prevCart => {
+          const newCart = prevCart.map(item =>
+            item.cartItemId === cartItemId ? { ...item, quantity } : item
+          );
+          toast.info('Quantité mise à jour', { autoClose: 2000 });
+          setCommandePassee(false);
+          return newCart;
+        });
+      }, 300);
     },
-    [cart]
+    []
   );
 
-  const updateQuantity = useCallback(
-    (id, quantity) => {
-      if (quantity < 1 || isNaN(quantity)) return;
-      
-      const newCart = cart.map((item) => 
-        item._id === id ? { ...item, quantity } : item
-      );
-      
-      setCart(newCart);
-      setCommandePassee(false);
+  const removeFromCart = useCallback(
+    cartItemId => {
+      setCart(prevCart => {
+        const newCart = prevCart.filter(item => item.cartItemId !== cartItemId);
+        toast.info('Article supprimé du panier', { autoClose: 2000 });
+        setCommandePassee(false);
+        return newCart;
+      });
     },
-    [cart]
+    []
   );
 
   const confirmModification = useCallback(
-    (item) => {
+    item => {
       toast.success(`Quantité pour ${item.name} modifiée à ${item.quantity}`, {
         autoClose: 2000,
       });
@@ -184,61 +204,50 @@ export default function Panier() {
     []
   );
 
-  const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const totalPrice = useMemo(() => {
+    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  }, [cart]);
 
-  const passerCommande = async () => {
+  const passerCommande = useCallback(async () => {
     if (cart.length === 0) {
-      toast.error('Votre panier est vide, impossible de passer la commande.', {
-        autoClose: 2000,
-      });
+      toast.error('Votre panier est vide.', { autoClose: 2000 });
       return;
     }
     if (!tableNumber || tableNumber === '0' || !bill) {
       toast.error('Numéro de table ou addition non défini.', { autoClose: 2000 });
       return;
     }
-
     setIsLoading(true);
     try {
       const bills = storage.get('bills') || [];
       const currentBill = bills.find(b => b.id === bill.id);
-
+      if (!currentBill) {
+        throw new Error('Bill not found in storage');
+      }
       const newOrder = {
         id: generateUUID(),
         billId: bill.id,
         tableNumber,
-        items: cart.map(({ _id, name, price, quantity }) => ({
+        items: cart.map(({ _id, name, price, quantity, cartItemId }) => ({
           _id,
           name,
           price,
           quantity,
+          cartItemId,
         })),
         totalPrice,
         date: new Date().toISOString(),
       };
-
-      // Update bill with new order
       const updatedBill = {
         ...currentBill,
-        orders: [...(currentBill?.orders || []), newOrder],
-        totalBillAmount: (currentBill?.totalBillAmount || 0) + totalPrice,
+        orders: [...(currentBill.orders || []), newOrder],
+        totalBillAmount: (currentBill.totalBillAmount || 0) + totalPrice,
       };
-
-      // Update bills in localStorage
-      const updatedBills = [
-        ...bills.filter(b => b.id !== bill.id),
-        updatedBill,
-      ];
-      
+      const updatedBills = [...bills.filter(b => b.id !== bill.id), updatedBill];
       storage.updateBills(updatedBills);
       storage.setSessionBill(tableNumber, bill.id);
       setBill(updatedBill);
-
-      // Clear the cart after successful order
-      setCart([]);
-      storage.updateCart([], tableNumber);
-
-      toast.success('Commande passée avec succès !', { autoClose: 2000 });
+      toast.success('Commande passée avec succès ! Vous pouvez ajouter d’autres articles.', { autoClose: 2000 });
       setCommandePassee(true);
     } catch (error) {
       console.error('Error saving order:', error);
@@ -246,30 +255,63 @@ export default function Panier() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [cart, tableNumber, bill, totalPrice]);
 
-  const nouvelleAddition = () => {
-    const newBillId = generateUUID();
-    const newBill = { 
-      id: newBillId, 
-      tableNumber, 
-      orders: [], 
-      totalBillAmount: 0 
+  const ajouterAutreCommande = useCallback(() => {
+    if (tableNumber === '0') {
+      toast.error('Numéro de table non défini. Veuillez sélectionner une table.', { autoClose: 2000 });
+      navigate('/client/choisir-tableau');
+      return;
+    }
+    if (cart.length > 0) {
+      passerCommande().then(() => {
+        setCart([]); // Clear the cart after saving the order
+        storage.updateCart([], tableNumber); // Update localStorage
+        navigate('/client/menu?view=categories'); // Navigate to categories
+      }).catch(error => {
+        console.error('Error in ajouterAutreCommande:', error);
+        toast.error('Erreur lors de l’ajout d’une autre commande.', { autoClose: 2000 });
+      });
+    } else {
+      navigate('/client/menu?view=categories'); // Navigate directly if cart is empty
+    }
+  }, [passerCommande, navigate, cart, tableNumber]);
+
+  const retourCategories = useCallback(() => {
+    if (tableNumber === '0') {
+      toast.error('Veuillez d’abord sélectionner un numéro de table.', {
+        autoClose: 2000,
+      });
+      return;
+    }
+    if (cart.length > 0 && !commandePassee) {
+      if (
+        !window.confirm(
+          'Vous avez des articles non commandés. Voulez-vous retourner aux catégories ?'
+        )
+      ) {
+        return;
+      }
+    }
+    navigate('/client/menu?view=categories');
+  }, [navigate, tableNumber, cart, commandePassee]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (quantityTimeoutRef.current) {
+        clearTimeout(quantityTimeoutRef.current);
+      }
     };
-    
-    const updatedBills = [...(storage.get('bills') || []), newBill];
-    storage.updateBills(updatedBills);
-    storage.setSessionBill(tableNumber, newBillId);
-    setBill(newBill);
-    
-    setCart([]);
-    storage.updateCart([], tableNumber);
-    setCommandePassee(false);
-    
-    toast.info(`Nouvelle addition démarrée pour la table n°${tableNumber}`, {
-      autoClose: 2000,
-    });
-  };
+  }, []);
+
+  console.log('Rendering Panier with state:', {
+    tableNumber,
+    cart,
+    commandePassee,
+    isLoading,
+    bill,
+  });
 
   if (tableNumber === '0') {
     return (
@@ -277,7 +319,20 @@ export default function Panier() {
         <Header tableNumber="" cartCount={0} />
         <main className={styles.mainContent}>
           <h2>Numéro de table non défini</h2>
-          <p>Veuillez revenir à la page d'accueil pour sélectionner votre numéro de table.</p>
+          <p>Veuillez sélectionner une table pour continuer.</p>
+          <button
+            onClick={() => {
+              if (tableNumber !== '0') {
+                storage.clearCart(tableNumber);
+                storage.clearBillData(tableNumber);
+              }
+              navigate('/client/choisir-tableau');
+            }}
+            className={styles.orderButton}
+            aria-label="Sélectionner une table"
+          >
+            Sélectionner une table
+          </button>
         </main>
         <Footer />
         <ToastContainer position="bottom-right" autoClose={2000} />
@@ -285,19 +340,28 @@ export default function Panier() {
     );
   }
 
-  if (cart.length === 0 && !bill?.orders?.length) {
+  if (cart.length === 0) {
     return (
       <div className={styles.container}>
         <Header tableNumber={tableNumber} cartCount={0} />
         <main className={styles.mainContent}>
           <h2>Votre panier est vide</h2>
-          <button
-            onClick={nouvelleAddition}
-            className={styles.orderButton}
-            aria-label="Démarrer une nouvelle addition"
-          >
-            Nouvelle addition
-          </button>
+          <div className={styles.commandeContainer}>
+            <button
+              onClick={retourCategories}
+              className={`${styles.orderButton} ${styles.categoriesButton}`}
+              aria-label="Retourner aux catégories"
+            >
+              <FaArrowLeft style={{ marginRight: '5px' }} /> Retour aux catégories
+            </button>
+            <button
+              onClick={ajouterAutreCommande}
+              className={styles.orderButton}
+              aria-label="Ajouter une autre commande"
+            >
+              Ajouter une autre commande
+            </button>
+          </div>
         </main>
         <Footer />
         <ToastContainer position="bottom-right" autoClose={2000} />
@@ -307,11 +371,20 @@ export default function Panier() {
 
   return (
     <div className={styles.container}>
-      <Header tableNumber={tableNumber} cartCount={cart.reduce((a, c) => a + c.quantity, 0)} />
+      <Header
+        tableNumber={tableNumber}
+        cartCount={cart.reduce((a, c) => a + c.quantity, 0)}
+      />
       <main className={styles.mainContent}>
-        <h2>Panier - Table n°{tableNumber} (Addition: {bill?.id?.slice(0, 8)})</h2>
-        
-        <div className={styles.cartContainer}>
+        <h2>
+          Panier - Table n°{tableNumber} (Addition: {bill?.id?.slice(0, 8)})
+        </h2>
+        <div className={`${styles.cartContainer} ${isLoading ? styles.loading : ''}`}>
+          {isLoading && (
+            <div className={styles.loadingOverlay}>
+              <div className={styles.spinner}></div>
+            </div>
+          )}
           <table className={styles.cartTable} role="grid">
             <thead>
               <tr>
@@ -323,8 +396,8 @@ export default function Panier() {
               </tr>
             </thead>
             <tbody>
-              {cart.map((item) => (
-                <tr key={item._id}>
+              {cart.map(item => (
+                <tr key={item.cartItemId} className={styles.cartItem}>
                   <td>{item.name}</td>
                   <td>{item.price.toFixed(2)} DT</td>
                   <td>
@@ -332,12 +405,13 @@ export default function Panier() {
                       type="number"
                       min="1"
                       value={item.quantity}
-                      onChange={(e) =>
-                        updateQuantity(item._id, parseInt(e.target.value, 10) || 1)
-                      }
+                      onChange={e => {
+                        const value = parseInt(e.target.value, 10);
+                        updateQuantity(item.cartItemId, isNaN(value) ? 1 : value);
+                      }}
                       className={styles.qtyInput}
                       aria-label={`Quantité pour ${item.name}`}
-                      disabled={commandePassee || isLoading}
+                      disabled={isLoading}
                     />
                   </td>
                   <td>{(item.price * item.quantity).toFixed(2)} DT</td>
@@ -346,15 +420,15 @@ export default function Panier() {
                       onClick={() => confirmModification(item)}
                       className={styles.modifyButton}
                       aria-label={`Modifier la quantité de ${item.name}`}
-                      disabled={commandePassee || isLoading}
+                      disabled={isLoading}
                     >
                       Modifier
                     </button>
                     <button
-                      onClick={() => removeFromCart(item._id)}
+                      onClick={() => removeFromCart(item.cartItemId)}
                       className={styles.removeButton}
                       aria-label={`Supprimer ${item.name} du panier`}
-                      disabled={commandePassee || isLoading}
+                      disabled={isLoading}
                     >
                       Supprimer
                     </button>
@@ -371,74 +445,56 @@ export default function Panier() {
                   {totalPrice.toFixed(2)} DT
                 </td>
               </tr>
+              <tr>
+                <td colSpan="3" className={styles.totalLabel}>
+                  Total addition :
+                </td>
+                <td colSpan="2" className={styles.totalPrice}>
+                  {(bill?.totalBillAmount || 0).toFixed(2)} DT
+                </td>
+              </tr>
             </tfoot>
           </table>
         </div>
-
-        {bill?.orders?.length > 0 && (
-          <div className={styles.billSummary}>
-            <h3>Récapitulatif de l'addition</h3>
-            <div className={styles.billStats}>
-              <div>
-                <span className={styles.statLabel}>Total addition:</span>
-                <span className={styles.statValue}>{bill.totalBillAmount.toFixed(2)} DT</span>
-              </div>
-              <div>
-                <span className={styles.statLabel}>Commandes:</span>
-                <span className={styles.statValue}>{bill.orders.length}</span>
-              </div>
-            </div>
-            
-            <details className={styles.orderDetails}>
-              <summary>Historique des commandes</summary>
-              <div className={styles.ordersContainer}>
-                {bill.orders.map((order) => (
-                  <div key={order.id} className={styles.orderCard}>
-                    <div className={styles.orderHeader}>
-                      <span>Commande #{order.id.slice(0, 8)}</span>
-                      <span>{new Date(order.date).toLocaleString()}</span>
-                    </div>
-                    <ul className={styles.orderItems}>
-                      {order.items.map((item) => (
-                        <li key={item._id} className={styles.orderItem}>
-                          <span>{item.name}</span>
-                          <span>x {item.quantity}</span>
-                          <span>{(item.price * item.quantity).toFixed(2)} DT</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className={styles.orderTotal}>
-                      Total: {order.totalPrice.toFixed(2)} DT
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </details>
-          </div>
-        )}
-
         <div className={styles.commandeContainer}>
           {!commandePassee ? (
-            <button
-              onClick={passerCommande}
-              className={styles.orderButton}
-              disabled={isLoading}
-              aria-label="Passer la commande"
-            >
-              {isLoading ? 'Validation...' : 'Passer la commande'}
-            </button>
+            <>
+              <button
+                onClick={passerCommande}
+                className={styles.orderButton}
+                disabled={isLoading}
+                aria-label="Passer la commande"
+              >
+                {isLoading ? 'Validation...' : 'Passer la commande'}
+              </button>
+              <button
+                onClick={retourCategories}
+                className={`${styles.orderButton} ${styles.categoriesButton}`}
+                aria-label="Retourner aux catégories"
+              >
+                <FaArrowLeft style={{ marginRight: '5px' }} /> Retour aux catégories
+              </button>
+            </>
           ) : (
             <div className={styles.postOrderActions}>
               <p className={styles.successMessage}>
-                Commande passée avec succès ! Vous pouvez continuer à ajouter des articles.
+                Commande passée avec succès ! Vous pouvez continuer à ajouter des
+                articles.
               </p>
               <button
-                onClick={nouvelleAddition}
+                onClick={retourCategories}
+                className={`${styles.orderButton} ${styles.categoriesButton}`}
+                aria-label="Retourner aux catégories"
+              >
+                <FaArrowLeft style={{ marginRight: '5px' }} /> Retour aux catégories
+              </button>
+              <button
+                onClick={ajouterAutreCommande}
                 className={`${styles.orderButton} ${styles.newBillButton}`}
-                aria-label="Démarrer une nouvelle addition"
+                aria-label="Ajouter une autre commande"
                 disabled={isLoading}
               >
-                Nouvelle addition
+                Ajouter une autre commande
               </button>
             </div>
           )}

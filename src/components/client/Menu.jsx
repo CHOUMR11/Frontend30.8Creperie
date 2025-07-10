@@ -39,6 +39,15 @@ const formatCurrency = (amount) => {
   return `${Number(amount).toFixed(3)} DT`;
 };
 
+// Utility for generating UUIDs
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export default function Menu() {
   /** ──────────────────────────────────────────────────────────────────────
    *  State management
@@ -101,23 +110,48 @@ export default function Menu() {
    *  ───────────────────────────────────────────────────────────────────────
    */
   // 1️⃣ Reset table number and cart on component mount to force table selection
-  useEffect(() => {
-    // Clear localStorage and reset state to ensure table selection on every visit
-    localStorage.removeItem('tableNumber');
-    localStorage.removeItem('cart_0'); // Clear default cart
+useEffect(() => {
+  const storedTableNumber = localStorage.getItem('tableNumber') || '';
+  console.log('Menu.jsx useEffect - storedTableNumber:', storedTableNumber); // Debugging
+  if (storedTableNumber && storedTableNumber !== '0' && !isNaN(storedTableNumber) && Number(storedTableNumber) > 0) {
+    setTableNumber(storedTableNumber);
+    setTableConfirmed(true);
+    console.log('Menu.jsx useEffect - Restored table:', storedTableNumber); // Debugging
+    const params = new URLSearchParams(location.search);
+    if (params.get('view') === 'categories') {
+      setSelectedCategory('');
+      console.log('Menu.jsx useEffect - Showing categories view for table:', storedTableNumber); // Debugging
+    }
+  } else {
     setTableNumber('');
     setTableConfirmed(false);
     setCart([]);
-  }, []); // Empty dependency array ensures this runs only on mount
+    localStorage.removeItem('tableNumber');
+    localStorage.removeItem('cart_0');
+    console.log('Menu.jsx useEffect - No valid table number, showing table selection'); // Debugging
+  }
+}, [location.search]); // Empty dependency array ensures this runs only on mount
 
-  // 2️⃣ Persist the cart in localStorage when cart or tableNumber changes
+  // 2️⃣ Load cart from localStorage when table is confirmed
   useEffect(() => {
-    if (tableNumber !== '' && tableConfirmed) {
+    if (tableConfirmed && tableNumber) {
+      const savedCart = localStorage.getItem(`cart_${tableNumber}`);
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+        console.log('Panier chargé depuis localStorage:', JSON.parse(savedCart)); // Débogage
+      }
+    }
+  }, [tableConfirmed, tableNumber]);
+
+  // 3️⃣ Persist the cart in localStorage when cart changes
+  useEffect(() => {
+    if (tableNumber && tableConfirmed) {
       localStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
+      console.log('Panier sauvegardé dans localStorage:', cart); // Débogage
     }
   }, [cart, tableNumber, tableConfirmed]);
 
-  // 3️⃣ Fetch menu from backend when table is confirmed
+  // 4️⃣ Fetch menu from backend when table is confirmed
   useEffect(() => {
     if (!tableConfirmed) return;
 
@@ -150,13 +184,16 @@ export default function Menu() {
    */
   const addToCart = useCallback((item) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i._id === item._id);
-      if (existing) {
-        return prev.map((i) =>
-          i._id === item._id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
+      console.log('Ajout au panier, article:', item); // Débogage
+      // Ajouter chaque article comme une nouvelle entrée avec un cartItemId unique
+      const newItem = {
+        ...item,
+        cartItemId: generateUUID(), // Identifiant unique pour chaque ajout
+        quantity: 1
+      };
+      const newCart = [...prev, newItem];
+      console.log('Nouvel article ajouté, panier:', newCart); // Débogage
+      return newCart;
     });
     toast.success(`${item.name} ajouté au panier !`);
   }, []);
@@ -168,6 +205,7 @@ export default function Menu() {
     }
     setTableConfirmed(true);
     localStorage.setItem('tableNumber', tableNumber);
+    console.log('Table confirmée:', tableNumber); // Débogage
   }, [tableNumber]);
 
   const resetTable = useCallback(() => {
@@ -180,9 +218,9 @@ export default function Menu() {
   }, [tableNumber]);
 
   const goToCart = useCallback(() => {
-    console.log('Navigating to /client/panier');
+    console.log('Navigation vers /client/panier, panier actuel:', cart); // Débogage
     navigate('/client/panier');
-  }, [navigate]);
+  }, [navigate, cart]);
 
   const handleImageClick = useCallback((imageUrl) => {
     setSelectedImage(imageUrl);
