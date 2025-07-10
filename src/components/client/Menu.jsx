@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getMenu } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+import 'react-lazy-load-image-component/src/effects/blur.css';
+import Decimal from 'decimal.js';
+import { debounce } from 'lodash';
 import Header from '../common/Header';
 import Footer from '../common/Footer';
 import styles from './Menu.module.css';
@@ -17,7 +21,7 @@ import boxImage from '../../assets/Box.jpg';
 import mojitoImage from '../../assets/Mojito.jpg';
 import juiceImage from '../../assets/Jus.jpg';
 import hotChocolateImage from '../../assets/Hot-Chocolate.jpg';
-import frappuccinoImage from '../../assets/frappucino.jpg';
+import frappuccinoImage from '../../assets/Frappucino.jpg';
 import smoothieImage from '../../assets/Smoothie.jpg';
 import jwajemImage from '../../assets/Jwajem.jpg';
 import waffleImage from '../../assets/Gauffre.jpg';
@@ -48,21 +52,50 @@ const generateUUID = () => {
   });
 };
 
+// Storage utility with error handling
+const storage = {
+  get: (key) => {
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      toast.error('Erreur lors de la lecture des données.', { autoClose: 2000 });
+      return null;
+    }
+  },
+  set: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      console.log(`Saved ${key} to localStorage:`, value);
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+      toast.error('Erreur lors de la sauvegarde des données.', { autoClose: 2000 });
+    }
+  },
+  remove: (key) => {
+    try {
+      localStorage.removeItem(key);
+      console.log(`Removed ${key} from localStorage`);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+      toast.error('Erreur lors de la suppression des données.', { autoClose: 2000 });
+    }
+  },
+};
+
 export default function Menu() {
-  /** ──────────────────────────────────────────────────────────────────────
-   *  State management
-   *  ───────────────────────────────────────────────────────────────────────
-   */
   const [tableNumber, setTableNumber] = useState('');
   const [tableConfirmed, setTableConfirmed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [isMenuLoading, setIsMenuLoading] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const colors = {
     primary: '#5D4037',
@@ -105,57 +138,55 @@ export default function Menu() {
     { name: 'Box', image: boxImage },
   ];
 
-  /** ──────────────────────────────────────────────────────────────────────
-   *  Effets ⇢ Initialisation / Persistance
-   *  ───────────────────────────────────────────────────────────────────────
-   */
-  // 1️⃣ Reset table number and cart on component mount to force table selection
-useEffect(() => {
-  const storedTableNumber = localStorage.getItem('tableNumber') || '';
-  console.log('Menu.jsx useEffect - storedTableNumber:', storedTableNumber); // Debugging
-  if (storedTableNumber && storedTableNumber !== '0' && !isNaN(storedTableNumber) && Number(storedTableNumber) > 0) {
-    setTableNumber(storedTableNumber);
-    setTableConfirmed(true);
-    console.log('Menu.jsx useEffect - Restored table:', storedTableNumber); // Debugging
-    const params = new URLSearchParams(location.search);
-    if (params.get('view') === 'categories') {
-      setSelectedCategory('');
-      console.log('Menu.jsx useEffect - Showing categories view for table:', storedTableNumber); // Debugging
-    }
-  } else {
-    setTableNumber('');
-    setTableConfirmed(false);
-    setCart([]);
-    localStorage.removeItem('tableNumber');
-    localStorage.removeItem('cart_0');
-    console.log('Menu.jsx useEffect - No valid table number, showing table selection'); // Debugging
-  }
-}, [location.search]); // Empty dependency array ensures this runs only on mount
+  // Debounced search handler
+  const debouncedSearch = useCallback(
+    debounce((value) => setCategorySearch(value), 300),
+    []
+  );
 
-  // 2️⃣ Load cart from localStorage when table is confirmed
+  // Restore table number and cart on mount
   useEffect(() => {
-    if (tableConfirmed && tableNumber) {
-      const savedCart = localStorage.getItem(`cart_${tableNumber}`);
-      if (savedCart) {
-        setCart(JSON.parse(savedCart));
-        console.log('Panier chargé depuis localStorage:', JSON.parse(savedCart)); // Débogage
+    const storedTableNumber = storage.get('tableNumber') || '';
+    console.log('Menu.jsx useEffect - storedTableNumber:', storedTableNumber);
+    if (
+      storedTableNumber &&
+      storedTableNumber !== '0' &&
+      !isNaN(storedTableNumber) &&
+      Number(storedTableNumber) > 0 &&
+      storedTableNumber.length <= 3
+    ) {
+      setTableNumber(storedTableNumber);
+      setTableConfirmed(true);
+      console.log('Menu.jsx useEffect - Restored table:', storedTableNumber);
+      const params = new URLSearchParams(location.search);
+      if (params.get('view') === 'categories') {
+        setSelectedCategory('');
+        console.log('Menu.jsx useEffect - Showing categories view for table:', storedTableNumber);
       }
+      const savedCart = storage.get(`cart_${storedTableNumber}`) || [];
+      setCart(savedCart);
+      console.log('Panier chargé depuis localStorage:', savedCart);
+    } else {
+      setTableNumber('');
+      setTableConfirmed(false);
+      setCart([]);
+      storage.remove('tableNumber');
+      console.log('Menu.jsx useEffect - No valid table number, showing table selection');
     }
-  }, [tableConfirmed, tableNumber]);
+  }, [location.search]);
 
-  // 3️⃣ Persist the cart in localStorage when cart changes
+  // Persist cart in localStorage
   useEffect(() => {
     if (tableNumber && tableConfirmed) {
-      localStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
-      console.log('Panier sauvegardé dans localStorage:', cart); // Débogage
+      storage.set(`cart_${tableNumber}`, cart);
+      console.log('Panier sauvegardé dans localStorage:', cart);
     }
   }, [cart, tableNumber, tableConfirmed]);
 
-  // 4️⃣ Fetch menu from backend when table is confirmed
+  // Fetch menu from backend
   useEffect(() => {
     if (!tableConfirmed) return;
-
-    setLoading(true);
+    setIsMenuLoading(true);
     getMenu()
       .then((res) => {
         console.log('Menu API Response:', res);
@@ -166,59 +197,67 @@ useEffect(() => {
         toast.error('Erreur lors du chargement du menu');
       })
       .finally(() => {
-        setLoading(false);
+        setIsMenuLoading(false);
       });
   }, [tableConfirmed]);
 
-  /** ──────────────────────────────────────────────────────────────────────
-   *  Calcul du total du panier
-   *  ───────────────────────────────────────────────────────────────────────
-   */
+  // Calculate cart total with decimal precision
   const cartTotal = useMemo(() => {
-    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
+    return cart.reduce((total, item) => {
+      return new Decimal(total).plus(new Decimal(item.price).times(item.quantity)).toNumber();
+    }, 0);
   }, [cart]);
 
-  /** ──────────────────────────────────────────────────────────────────────
-   *  Fonctions ⇢ Gestion du panier
-   *  ───────────────────────────────────────────────────────────────────────
-   */
+  // Cart management functions
   const addToCart = useCallback((item) => {
     setCart((prev) => {
-      console.log('Ajout au panier, article:', item); // Débogage
-      // Ajouter chaque article comme une nouvelle entrée avec un cartItemId unique
+      console.log('Ajout au panier, article:', item);
       const newItem = {
         ...item,
-        cartItemId: generateUUID(), // Identifiant unique pour chaque ajout
-        quantity: 1
+        cartItemId: generateUUID(),
+        quantity: 1,
       };
       const newCart = [...prev, newItem];
-      console.log('Nouvel article ajouté, panier:', newCart); // Débogage
+      console.log('Nouvel article ajouté, panier:', newCart);
       return newCart;
     });
     toast.success(`${item.name} ajouté au panier !`);
   }, []);
 
   const confirmTable = useCallback(() => {
-    if (!tableNumber.trim() || Number(tableNumber) <= 0) {
-      toast.error('Veuillez saisir un numéro de table valide');
+    if (!tableNumber.trim() || Number(tableNumber) <= 0 || tableNumber.length > 3) {
+      toast.error('Veuillez saisir un numéro de table valide (1 à 999)');
       return;
     }
     setTableConfirmed(true);
-    localStorage.setItem('tableNumber', tableNumber);
-    console.log('Table confirmée:', tableNumber); // Débogage
+    storage.set('tableNumber', tableNumber);
+    console.log('Table confirmée:', tableNumber);
   }, [tableNumber]);
 
   const resetTable = useCallback(() => {
+    // Réinitialiser les états côté client
     setTableNumber('');
     setTableConfirmed(false);
     setCart([]);
-    localStorage.removeItem('tableNumber');
-    localStorage.removeItem(`cart_${tableNumber}`);
-    toast.info('Numéro de table réinitialisé.');
-  }, [tableNumber]);
+    setSelectedCategory('');
+    setCategorySearch('');
+    setSelectedImage(null);
+
+    // Supprimer les données du localStorage
+    const keysToRemove = Object.keys(localStorage).filter(
+      (key) => key === `cart_${tableNumber}` || key === `bill_${tableNumber}` || key === 'tableNumber'
+    );
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+    console.log(`Données de la table ${tableNumber} supprimées : panier et facture réinitialisés.`);
+    toast.info('Table quittée. Panier et facture réinitialisés.');
+
+    // Rediriger vers la page de menu
+    navigate('/client/menu');
+  }, [tableNumber, navigate]);
 
   const goToCart = useCallback(() => {
-    console.log('Navigation vers /client/panier, panier actuel:', cart); // Débogage
+    console.log('Navigation vers /client/panier, panier actuel:', cart);
     navigate('/client/panier');
   }, [navigate, cart]);
 
@@ -230,10 +269,7 @@ useEffect(() => {
     setSelectedImage(null);
   }, []);
 
-  /** ──────────────────────────────────────────────────────────────────────
-   *  Filtrage ⇢ Catégories & Items
-   *  ───────────────────────────────────────────────────────────────────────
-   */
+  // Filter categories and menu items
   const filteredCategories = useMemo(() => {
     return fixedCategories.filter((cat) =>
       cat.name.toLowerCase().includes(categorySearch.toLowerCase())
@@ -246,15 +282,11 @@ useEffect(() => {
 
   const cartCount = cart.reduce((acc, cur) => acc + cur.quantity, 0);
 
-  /** ──────────────────────────────────────────────────────────────────────
-   *  Écran “Choix du numéro de table”
-   *  ───────────────────────────────────────────────────────────────────────
-   */
+  // Table selection screen
   if (!tableConfirmed) {
     return (
       <div className={styles.container}>
         <Header tableNumber={tableNumber} cartCount={cartCount} />
-
         <div className={styles.tableSelectionCard}>
           <h2 className={styles.title}>Choisissez votre numéro de table</h2>
           <input
@@ -262,6 +294,7 @@ useEffect(() => {
             value={tableNumber}
             onChange={(e) => setTableNumber(e.target.value)}
             min="1"
+            max="999"
             className={styles.tableInput}
             placeholder="Numéro de table"
             aria-label="Numéro de table"
@@ -274,20 +307,20 @@ useEffect(() => {
             Valider
           </button>
         </div>
-
         <Footer />
+        <ToastContainer
+          position="bottom-right"
+          autoClose={3000}
+          toastStyle={{ backgroundColor: colors.dark, color: colors.white }}
+        />
       </div>
     );
   }
 
-  /** ──────────────────────────────────────────────────────────────────────
-   *  Écran “Affichage du menu”
-   *  ───────────────────────────────────────────────────────────────────────
-   */
+  // Menu display screen
   return (
     <div className={styles.menuContainer}>
       <Header tableNumber={tableNumber} cartCount={cartCount} />
-
       <main className={styles.mainContent}>
         {!selectedCategory ? (
           <div className={styles.categorySection}>
@@ -295,12 +328,12 @@ useEffect(() => {
             <input
               type="text"
               value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
+              onChange={(e) => debouncedSearch(e.target.value)}
               className={styles.searchInput}
               placeholder="Rechercher une catégorie..."
               aria-label="Rechercher une catégorie"
             />
-            {loading ? (
+            {isMenuLoading ? (
               <div className={styles.loadingContainer}>
                 <div className={styles.spinner}>
                   <span className={styles.dot}></span>
@@ -319,6 +352,13 @@ useEffect(() => {
                       key={cat.name}
                       className={styles.categoryCard}
                       onClick={() => setSelectedCategory(cat.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          setSelectedCategory(cat.name);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                       aria-label={`Sélectionner la catégorie ${cat.name}`}
                     >
                       <div className={styles.categoryImageWrapper}>
@@ -343,14 +383,13 @@ useEffect(() => {
                 className={styles.backButton}
                 aria-label="Retourner à la liste des catégories"
               >
-                ← Retour aux catégories
+                ← Retourner à la liste des catégories
               </button>
               <h3 className={styles.categoryTitle}>
                 Catégorie : {selectedCategory}
               </h3>
             </div>
-
-            {loading ? (
+            {isMenuLoading ? (
               <div className={styles.loadingContainer}>
                 <div className={styles.spinner}>
                   <span className={styles.dot}></span>
@@ -385,16 +424,16 @@ useEffect(() => {
                   return (
                     <div key={item._id} className={styles.menuItemCard}>
                       <div className={styles.itemImageContainer}>
-                        <img
+                        <LazyLoadImage
                           src={imageUrl}
                           alt={item.name}
+                          effect="blur"
+                          placeholderSrc="https://picsum.photos/200/100?random=200"
                           className={styles.itemImage}
                           onClick={() => handleImageClick(imageUrl)}
                           onError={(e) => {
-                            console.warn(
-                              `Erreur chargement image pour ${item.name}: ${imageUrl}`
-                            );
-                            e.target.onerror = null;
+                            console.warn(`Erreur chargement image pour ${item.name}: ${imageUrl}`);
+                            toast.error(`Impossible de charger l'image pour ${item.name}`);
                             e.target.src = 'https://picsum.photos/200/100?random=200';
                           }}
                           style={{ cursor: 'pointer' }}
@@ -428,7 +467,6 @@ useEffect(() => {
           </div>
         )}
       </main>
-
       <div className={styles.floatingCartButton}>
         <button
           className={styles.cartButton}
@@ -441,7 +479,6 @@ useEffect(() => {
           )}
         </button>
       </div>
-
       {selectedImage && (
         <div
           className={styles.imageModal}
@@ -460,30 +497,31 @@ useEffect(() => {
             >
               ✕
             </button>
-            <img
+            <LazyLoadImage
               src={selectedImage}
               alt="Image agrandie"
+              effect="blur"
+              placeholderSrc="https://picsum.photos/600/400"
               className={styles.modalImage}
               onError={(e) => {
                 console.warn(`Erreur chargement modal image: ${selectedImage}`);
-                e.target.src = 'https://picsum.photos/600/300?random=3';
+                toast.error('Impossible de charger l\'image agrandie');
+                e.target.src = 'https://picsum.photos/600/400';
               }}
             />
           </div>
         </div>
       )}
-
       <div className={styles.resetButtonContainer}>
         <button
           type="button"
           onClick={resetTable}
           className={styles.resetButton}
-          aria-label="Réinitialiser le numéro de table"
+          aria-label="Quitter la table"
         >
           Quitter la table
         </button>
       </div>
-
       <Footer />
       <ToastContainer
         position="bottom-right"

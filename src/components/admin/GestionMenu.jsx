@@ -1,4 +1,3 @@
-// GestionMenu.jsx
 import React, { useState, useEffect } from 'react';
 import styles from './GestionMenu.module.css';
 
@@ -15,8 +14,8 @@ export default function GestionMenu() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ─── POINT ALL REQUESTS HERE ─────────────────────────────────────────────────────
-  const API_URL = 'https://backendmenu-3.onrender.com';
+  // Point all requests to the correct endpoint
+  const API_URL = 'https://backendmenu-3.onrender.com/api/menu';
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -27,9 +26,19 @@ export default function GestionMenu() {
           throw new Error(`Erreur réseau: ${res.status} ${res.statusText}`);
         }
         const data = await res.json();
-        // map _id → id to normalize
-        const normalizedData = data.map((item) => ({
-          id: item._id,
+        console.log('Raw API response:', data); // Debugging
+        // Handle different response structures
+        let menuData = [];
+        if (Array.isArray(data)) {
+          menuData = data;
+        } else if (data && Array.isArray(data.data)) {
+          menuData = data.data; // Handle { data: [...] } structure
+        } else {
+          throw new Error('Réponse API invalide: les données ne sont pas un tableau');
+        }
+        // Map _id → id to normalize
+        const normalizedData = menuData.map((item) => ({
+          id: item._id || item.id || `temp-${Math.random().toString(36).substr(2, 9)}`, // Fallback ID
           name: item.name || '',
           price: item.price || 0,
           description: item.description || '',
@@ -38,7 +47,7 @@ export default function GestionMenu() {
         }));
         setMenu(normalizedData);
       } catch (err) {
-        console.error('Erreur chargement menu:', err);
+        console.error('Erreur chargement menu:', err.message, err.stack);
         setError(`Erreur lors du chargement du menu: ${err.message}`);
       } finally {
         setLoading(false);
@@ -63,7 +72,7 @@ export default function GestionMenu() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // ── Validate required fields ────────────────────────────────────────────────
+    // Validate required fields
     if (!formData.name || formData.price === '' || !formData.category) {
       setError('Nom, prix et catégorie sont obligatoires');
       return;
@@ -84,7 +93,7 @@ export default function GestionMenu() {
 
     try {
       if (editIndex !== null) {
-        // ── UPDATE EXISTING ITEM ─────────────────────────────────────────────────
+        // Update existing item
         const itemToUpdate = menu[editIndex];
         const response = await fetch(`${API_URL}/${itemToUpdate.id}`, {
           method: 'PUT',
@@ -99,7 +108,7 @@ export default function GestionMenu() {
         }
         const updatedItem = await response.json();
         const normalizedUpdatedItem = {
-          id: updatedItem._id,
+          id: updatedItem._id || updatedItem.id,
           name: updatedItem.name,
           price: updatedItem.price,
           description: updatedItem.description,
@@ -111,7 +120,7 @@ export default function GestionMenu() {
         setMenu(updatedMenu);
         setEditIndex(null);
       } else {
-        // ── CREATE NEW ITEM ────────────────────────────────────────────────────────
+        // Create new item
         const response = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -125,7 +134,7 @@ export default function GestionMenu() {
         }
         const newItem = await response.json();
         const normalizedNewItem = {
-          id: newItem._id,
+          id: newItem._id || newItem.id,
           name: newItem.name,
           price: newItem.price,
           description: newItem.description,
@@ -143,7 +152,7 @@ export default function GestionMenu() {
         category: '',
       });
     } catch (err) {
-      console.error('Erreur lors de la sauvegarde:', err);
+      console.error('Erreur lors de la sauvegarde:', err.message, err.stack);
       setError(`Erreur lors de la sauvegarde: ${err.message}`);
     }
   };
@@ -167,7 +176,7 @@ export default function GestionMenu() {
       updated.splice(index, 1);
       setMenu(updated);
     } catch (err) {
-      console.error('Erreur suppression:', err);
+      console.error('Erreur suppression:', err.message, err.stack);
       setError(`Erreur lors de la suppression: ${err.message}`);
     }
   };
