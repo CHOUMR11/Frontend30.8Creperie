@@ -1,12 +1,13 @@
+
 import React, { useEffect } from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-
 import GestionMenu from '../components/admin/GestionMenu';
 import ListeCommandes from '../components/admin/ListeCommandes';
 
 export default function AdminPage() {
   const navigate = useNavigate();
 
+  // Vérification de l'authentification au chargement
   useEffect(() => {
     const isAuthenticated = localStorage.getItem('isAuthenticated');
     if (isAuthenticated !== 'true') {
@@ -14,6 +15,7 @@ export default function AdminPage() {
     }
   }, [navigate]);
 
+  // Gestion de la déconnexion
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
     navigate('/login-admin'); // Redirige vers la page de connexion
@@ -21,17 +23,23 @@ export default function AdminPage() {
 
   return (
     <div>
+      {/* Bouton de déconnexion */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem' }}>
-        <button onClick={handleLogout} style={logoutStyle}>🚪 Se déconnecter</button>
+        <button onClick={handleLogout} style={logoutStyle}>
+          🚪 Se déconnecter
+        </button>
       </div>
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginTop: '2rem',
-        gap: '1rem'
-      }}>
+      {/* Menu de navigation */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          marginTop: '2rem',
+          gap: '1rem',
+        }}
+      >
         <Link to="/admin/menu">
           <button style={buttonStyle}>📋 Gestion du Menu</button>
         </Link>
@@ -40,6 +48,7 @@ export default function AdminPage() {
         </Link>
       </div>
 
+      {/* Contenu des routes */}
       <div style={{ marginTop: '3rem', padding: '1rem' }}>
         <Routes>
           <Route path="/menu" element={<GestionMenu />} />
