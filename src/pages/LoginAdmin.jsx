@@ -4,40 +4,33 @@ import { useNavigate } from 'react-router-dom';
 export default function LoginAdmin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
-  // Synchroniser l'état d'authentification avec localStorage
+  // Vérifie le statut d'authentification au chargement
   useEffect(() => {
-    const handleStorageChange = () => {
-      setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    const authStatus = localStorage.getItem('isAuthenticated') === 'true';
+    setIsAuthenticated(authStatus);
   }, []);
 
   const handleLogin = () => {
     if (username === 'admin' && password === 'admin123') {
       localStorage.setItem('isAuthenticated', 'true');
       setIsAuthenticated(true);
-      // Commenté pour rester sur la page et tester le bouton "Se déconnecter"
-      // navigate('/admin');
+      navigate('/admin');
     } else {
       alert('Identifiants incorrects !');
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    setIsAuthenticated(false);
-    setUsername('');
-    setPassword('');
-    // Pas de redirection ni de rechargement pour rester sur la page
+  const handleGoToDashboard = () => {
+    navigate('/admin');
   };
 
   return (
     <div style={containerStyle}>
       <h2>Connexion Admin</h2>
+
       {!isAuthenticated ? (
         <>
           <input
@@ -54,13 +47,15 @@ export default function LoginAdmin() {
             onChange={(e) => setPassword(e.target.value)}
             style={inputStyle}
           />
-          <button onClick={handleLogin} style={buttonStyle}>Se connecter</button>
+          <button onClick={handleLogin} style={buttonStyle}>
+            Se connecter
+          </button>
         </>
       ) : (
         <>
-          <p>Connecté en tant qu'admin</p>
-          <button onClick={handleLogout} style={{ ...buttonStyle, backgroundColor: '#dc3545' }}>
-            Se déconnecter
+          <p>Vous êtes déjà connecté.</p>
+          <button onClick={handleGoToDashboard} style={buttonStyle}>
+            Accéder à l'espace Admin
           </button>
         </>
       )}
@@ -73,13 +68,13 @@ const containerStyle = {
   flexDirection: 'column',
   alignItems: 'center',
   marginTop: '100px',
-  gap: '1rem'
+  gap: '1rem',
 };
 
 const inputStyle = {
   padding: '0.5rem',
-  width: '200px',
-  fontSize: '1rem'
+  width: '220px',
+  fontSize: '1rem',
 };
 
 const buttonStyle = {
@@ -88,5 +83,5 @@ const buttonStyle = {
   color: 'white',
   border: 'none',
   borderRadius: '5px',
-  cursor: 'pointer'
+  cursor: 'pointer',
 };

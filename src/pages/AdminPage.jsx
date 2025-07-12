@@ -1,6 +1,5 @@
-
 import React, { useEffect } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import GestionMenu from '../components/admin/GestionMenu';
 import ListeCommandes from '../components/admin/ListeCommandes';
 
@@ -11,35 +10,28 @@ export default function AdminPage() {
   useEffect(() => {
     const isAuthenticated = localStorage.getItem('isAuthenticated');
     if (isAuthenticated !== 'true') {
-      navigate('/');
+      navigate('/admin/login');
     }
   }, [navigate]);
 
   // Gestion de la déconnexion
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
-    navigate('/login-admin'); // Redirige vers la page de connexion
+    navigate('/admin/login'); // Redirige vers la page de connexion
   };
 
   return (
-    <div>
-      {/* Bouton de déconnexion */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem' }}>
+    <div style={{ padding: '1rem' }}>
+      {/* Top bar : message de bienvenue + bouton de déconnexion */}
+      <div style={topBarStyle}>
+        <span style={welcomeStyle}>Bienvenue, Admin 👋</span>
         <button onClick={handleLogout} style={logoutStyle}>
           🚪 Se déconnecter
         </button>
       </div>
 
       {/* Menu de navigation */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          marginTop: '2rem',
-          gap: '1rem',
-        }}
-      >
+      <div style={navContainerStyle}>
         <Link to="/admin/menu">
           <button style={buttonStyle}>📋 Gestion du Menu</button>
         </Link>
@@ -48,9 +40,11 @@ export default function AdminPage() {
         </Link>
       </div>
 
-      {/* Contenu des routes */}
-      <div style={{ marginTop: '3rem', padding: '1rem' }}>
+      {/* Routes internes de la page admin */}
+      <div style={{ marginTop: '2rem', padding: '1rem' }}>
         <Routes>
+          {/* Redirection automatique vers /admin/menu */}
+          <Route path="/" element={<Navigate to="/admin/menu" replace />} />
           <Route path="/menu" element={<GestionMenu />} />
           <Route path="/commandes" element={<ListeCommandes />} />
         </Routes>
@@ -58,6 +52,39 @@ export default function AdminPage() {
     </div>
   );
 }
+
+// 💄 Styles
+const topBarStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '2rem',
+  padding: '0.5rem 1rem',
+  backgroundColor: '#f8f9fa',
+  borderRadius: '8px',
+};
+
+const welcomeStyle = {
+  fontSize: '1.2rem',
+  fontWeight: 'bold',
+};
+
+const logoutStyle = {
+  padding: '0.6rem 1.2rem',
+  fontSize: '1rem',
+  backgroundColor: '#dc3545',
+  color: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  cursor: 'pointer',
+};
+
+const navContainerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '1rem',
+};
 
 const buttonStyle = {
   padding: '0.8rem 2rem',
@@ -67,16 +94,4 @@ const buttonStyle = {
   border: 'none',
   borderRadius: '8px',
   cursor: 'pointer',
-  transition: 'background 0.3s',
-};
-
-const logoutStyle = {
-  padding: '0.8rem 2rem',
-  fontSize: '1rem',
-  backgroundColor: '#dc3545',
-  color: 'white',
-  border: 'none',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  transition: 'background 0.3s',
 };
