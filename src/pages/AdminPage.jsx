@@ -17,14 +17,16 @@ export default function AdminPage() {
   // Gestion de la déconnexion
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
-    navigate('/admin/login'); // Redirige vers la page de connexion
+    navigate('/admin/login');
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
-      {/* Top bar : message de bienvenue + bouton de déconnexion */}
-      <div style={topBarStyle}>
-        <span style={welcomeStyle}>Bienvenue, Admin 👋</span>
+    <div style={pageContainer}>
+      {/* Barre supérieure sous le Header */}
+      <div style={topBarContainer}>
+        <div style={adminInfo}>
+          <span>👤 Connecté en tant qu'Admin</span>
+        </div>
         <button onClick={handleLogout} style={logoutStyle}>
           🚪 Se déconnecter
         </button>
@@ -40,13 +42,12 @@ export default function AdminPage() {
         </Link>
       </div>
 
-      {/* Routes internes de la page admin */}
+      {/* Contenu interne des routes admin */}
       <div style={{ marginTop: '2rem', padding: '1rem' }}>
         <Routes>
-          {/* Redirection automatique vers /admin/menu */}
-          <Route path="/" element={<Navigate to="/admin/menu" replace />} />
-          <Route path="/menu" element={<GestionMenu />} />
-          <Route path="/commandes" element={<ListeCommandes />} />
+          <Route index element={<Navigate to="menu" replace />} />
+          <Route path="menu" element={<GestionMenu />} />
+          <Route path="commandes" element={<ListeCommandes />} />
         </Routes>
       </div>
     </div>
@@ -54,19 +55,24 @@ export default function AdminPage() {
 }
 
 // 💄 Styles
-const topBarStyle = {
+const pageContainer = {
+  padding: '1rem',
+};
+
+const topBarContainer = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginBottom: '2rem',
-  padding: '0.5rem 1rem',
-  backgroundColor: '#f8f9fa',
+  backgroundColor: '#e9ecef',
+  padding: '1rem',
   borderRadius: '8px',
+  marginBottom: '2rem',
+  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
 };
 
-const welcomeStyle = {
-  fontSize: '1.2rem',
-  fontWeight: 'bold',
+const adminInfo = {
+  fontSize: '1.1rem',
+  fontWeight: '500',
 };
 
 const logoutStyle = {
