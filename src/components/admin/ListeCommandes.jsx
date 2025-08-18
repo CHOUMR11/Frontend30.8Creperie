@@ -29,6 +29,7 @@ const useBills = (storageKey) => {
   const [bills, setBills] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [wsError, setWsError] = useState(null);
 
   // Validate bill structure
   const validateBill = (bill) => {
@@ -43,9 +44,9 @@ const useBills = (storageKey) => {
       try {
         const response = await fetch('https://backendmenu-3.onrender.com/api/orders');
         if (response.ok) {
-          data = await response.json();
+          const orders = await response.json();
           // Transformer orders en bills
-          data = data.map(order => ({
+          data = orders.map(order => ({
             id: order._id,
             tableNumber: order.tableNumber,
             orders: [{
@@ -133,6 +134,8 @@ const useBills = (storageKey) => {
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
+          setWsError('Erreur lors de la réception des données WebSocket');
+          setTimeout(() => setWsError(null), 3000);
         }
       };
 
@@ -141,7 +144,11 @@ const useBills = (storageKey) => {
         setTimeout(connectWebSocket, 5000); // Reconnect after 5 seconds
       };
 
-      ws.onerror = (error) => console.error('Erreur WebSocket:', error);
+      ws.onerror = (error) => {
+        console.error('Erreur WebSocket:', error);
+        setWsError('Erreur de connexion WebSocket');
+        setTimeout(() => setWsError(null), 3000);
+      };
     };
 
     connectWebSocket();
@@ -149,7 +156,7 @@ const useBills = (storageKey) => {
     return () => ws && ws.close();
   }, [storageKey]);
 
-  return { bills, isLoading, error, fetchBills, syncBills };
+  return { bills, isLoading, error, wsError, fetchBills, syncBills };
 };
 
 // Notification component
@@ -416,7 +423,7 @@ const BillCard = ({ bill, currency, onEdit }) => {
 
 // Main ListeCommandes component
 const ListeCommandes = ({ storageKey = 'allBills', currency = 'DT', onEdit }) => {
-  const { bills, isLoading, error, fetchBills, syncBills } = useBills(storageKey);
+  const { bills, isLoading, error, wsError, fetchBills, syncBills } = useBills(storageKey);
   const [dailyTotal, setDailyTotal] = useState(0);
   const [dailyDetails, setDailyDetails] = useState([]);
   const [sortBy, setSortBy] = useState('date-desc');
@@ -631,13 +638,14 @@ const ListeCommandes = ({ storageKey = 'allBills', currency = 'DT', onEdit }) =>
     });
     const interval = setInterval(() => {
       syncBills();
-    }, 60000); // Sync every 60 seconds
+    }, 300000); // Sync every 5 minutes
     return () => clearInterval(interval);
   }, [fetchBills, syncBills]);
 
   return (
     <div className={styles.container}>
       {notification && <Notification message={notification.message} type={notification.type} />}
+      {wsError && <Notification message={wsError} type="error" />}
       <div className={styles.header}>
         <h1 className={styles.title}><FaTable /> Historique des Factures</h1>
         <Stats stats={billStats} currency={currency} onShowGrandTotal={() => setShowGrandTotal(true)} />
