@@ -47,10 +47,10 @@ const useBills = (storageKey) => {
           const orders = await response.json();
           // Transformer orders en bills
           data = orders.map(order => ({
-            id: order._id,
+            id: order._id.toString(),
             tableNumber: order.tableNumber,
             orders: [{
-              id: order._id,
+              id: order._id.toString(),
               date: order.createdAt,
               items: order.items.map(item => ({
                 name: item.menuItem.name,
@@ -112,27 +112,16 @@ const useBills = (storageKey) => {
         try {
           const message = JSON.parse(event.data);
           if (message.type === 'orders' && Array.isArray(message.data)) {
-            // Transformer orders en bills
-            const updatedBills = message.data.map(order => ({
-              id: order._id,
-              tableNumber: order.tableNumber,
-              orders: [{
-                id: order._id,
-                date: order.createdAt,
-                items: order.items.map(item => ({
-                  name: item.menuItem.name,
-                  price: item.menuItem.price,
-                  quantity: item.quantity
-                })),
-                totalPrice: order.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
-              }],
-              totalBillAmount: order.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
-            }));
+            // Les données sont déjà au format bills
+            const updatedBills = message.data.filter(validateBill);
             console.log('WebSocket bills received:', updatedBills);
             setBills(updatedBills);
             localStorage.setItem(storageKey, JSON.stringify(updatedBills));
-            // Notification pour les mises à jour WebSocket
             showNotification('Factures mises à jour en temps réel', 'success');
+          } else if (message.type === 'error') {
+            console.error('WebSocket error message:', message.message);
+            setWsError(message.message);
+            setTimeout(() => setWsError(null), 3000);
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
