@@ -41,17 +41,33 @@ const useBills = (storageKey) => {
       setIsLoading(true);
       let data;
       try {
-        const response = await fetch('https://backendmenu-3.onrender.com/api/bills');
+        const response = await fetch('https://backendmenu-3.onrender.com/api/orders');
         if (response.ok) {
           data = await response.json();
-          console.log('Bills fetched from backend:', data);
+          // Transformer orders en bills
+          data = data.map(order => ({
+            id: order._id,
+            tableNumber: order.tableNumber,
+            orders: [{
+              id: order._id,
+              date: order.createdAt,
+              items: order.items.map(item => ({
+                name: item.menuItem.name,
+                price: item.menuItem.price,
+                quantity: item.quantity
+              })),
+              totalPrice: order.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
+            }],
+            totalBillAmount: order.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
+          }));
+          console.log('Orders fetched from backend and transformed to bills:', data);
           localStorage.setItem(storageKey, JSON.stringify(data)); // Sync localStorage
         } else {
           console.warn(`Backend fetch failed: ${response.status} ${response.statusText}`);
           throw new Error('Backend fetch failed');
         }
       } catch (backendError) {
-        console.warn('Failed to fetch bills from backend, using localStorage:', backendError.message);
+        console.warn('Failed to fetch orders from backend, using localStorage:', backendError.message);
         const rawData = localStorage.getItem(storageKey);
         data = rawData ? JSON.parse(rawData) : [];
       }
@@ -84,6 +100,54 @@ const useBills = (storageKey) => {
     console.log('Bills synced:', data);
     return data;
   }, [fetchBills]);
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    let ws;
+    const connectWebSocket = () => {
+      ws = new WebSocket('wss://backendmenu-3.onrender.com');
+      
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'orders' && Array.isArray(message.data)) {
+            // Transformer orders en bills
+            const updatedBills = message.data.map(order => ({
+              id: order._id,
+              tableNumber: order.tableNumber,
+              orders: [{
+                id: order._id,
+                date: order.createdAt,
+                items: order.items.map(item => ({
+                  name: item.menuItem.name,
+                  price: item.menuItem.price,
+                  quantity: item.quantity
+                })),
+                totalPrice: order.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
+              }],
+              totalBillAmount: order.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
+            }));
+            console.log('WebSocket bills received:', updatedBills);
+            setBills(updatedBills);
+            localStorage.setItem(storageKey, JSON.stringify(updatedBills));
+          }
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('Connexion WebSocket fermée, tentative de reconnexion...');
+        setTimeout(connectWebSocket, 5000); // Reconnect after 5 seconds
+      };
+
+      ws.onerror = (error) => console.error('Erreur WebSocket:', error);
+    };
+
+    connectWebSocket();
+
+    return () => ws && ws.close();
+  }, [storageKey]);
 
   return { bills, isLoading, error, fetchBills, syncBills };
 };
@@ -570,9 +634,6 @@ const ListeCommandes = ({ storageKey = 'allBills', currency = 'DT', onEdit }) =>
     }, 60000); // Sync every 60 seconds
     return () => clearInterval(interval);
   }, [fetchBills, syncBills]);
-
-  if (isLoading) return <div className={styles.loadingContainer}>Chargement...</div>;
-  if (error) return <div className={styles.errorContainer}>{error}</div>;
 
   return (
     <div className={styles.container}>
