@@ -42,7 +42,7 @@ const useBills = (storageKey) => {
       setIsLoading(true);
       let data;
       try {
-        const response = await fetch('https://backendmenu-3.onrender.com/api/orders');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/orders`);
         if (response.ok) {
           const orders = await response.json();
           // Transformer orders en bills
@@ -106,7 +106,7 @@ const useBills = (storageKey) => {
   useEffect(() => {
     let ws;
     const connectWebSocket = () => {
-      ws = new WebSocket('wss://backendmenu-3.onrender.com');
+      ws = new WebSocket(process.env.REACT_APP_WS_URL);
       
       ws.onmessage = (event) => {
         try {
@@ -131,6 +131,8 @@ const useBills = (storageKey) => {
             console.log('WebSocket bills received:', updatedBills);
             setBills(updatedBills);
             localStorage.setItem(storageKey, JSON.stringify(updatedBills));
+            // Notification pour les mises à jour WebSocket
+            showNotification('Factures mises à jour en temps réel', 'success');
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
