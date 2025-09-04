@@ -3,9 +3,9 @@ import PropTypes from 'prop-types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import styles from './ListeCommandes.module.css';
-import { 
-  FaSort, FaFilter, FaFileExport, FaTrash, FaEdit, FaSync, 
-  FaTable, FaCalendarAlt, FaSearch, FaInfoCircle, FaReceipt, 
+import {
+  FaSort, FaFilter, FaFileExport, FaTrash, FaEdit, FaSync,
+  FaTable, FaCalendarAlt, FaSearch, FaInfoCircle, FaReceipt,
   FaChevronDown, FaChevronUp, FaStore, FaUser, FaMoneyBillWave,
   FaPrint, FaCalculator
 } from 'react-icons/fa';
@@ -24,8 +24,24 @@ const formatCurrency = (amount) => {
   return `${Number(amount).toFixed(3)} DT`;
 };
 
+// Notification component
+const Notification = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className={`${styles.notification} ${type === 'error' ? styles.notificationError : styles.notificationSuccess}`}>
+      {message}
+    </div>
+  );
+};
+
 // Custom hook for managing bills
-const useBills = (storageKey) => {
+const useBills = (storageKey, showNotification) => {
   const [bills, setBills] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,12 +137,12 @@ const useBills = (storageKey) => {
           } else if (message.type === 'error') {
             console.error('WebSocket error message:', message.message);
             setWsError(message.message);
-            setTimeout(() => setWsError(null), 3000);
+            showNotification(message.message, 'error');
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
           setWsError('Erreur lors de la réception des données WebSocket');
-          setTimeout(() => setWsError(null), 3000);
+          showNotification('Erreur lors de la réception des données WebSocket', 'error');
         }
       };
 
@@ -138,24 +154,17 @@ const useBills = (storageKey) => {
       ws.onerror = (error) => {
         console.error('Erreur WebSocket:', error);
         setWsError('Erreur de connexion WebSocket');
-        setTimeout(() => setWsError(null), 3000);
+        showNotification('Erreur de connexion WebSocket', 'error');
       };
     };
 
     connectWebSocket();
 
     return () => ws && ws.close();
-  }, [storageKey]);
+  }, [storageKey, showNotification]);
 
   return { bills, isLoading, error, wsError, fetchBills, syncBills };
 };
-
-// Notification component
-const Notification = ({ message, type }) => (
-  <div className={`${styles.notification} ${type === 'error' ? styles.notificationError : styles.notificationSuccess}`}>
-    {message}
-  </div>
-);
 
 // Filters component
 const Filters = ({ dateFilter, setDateFilter, tableFilter, setTableFilter, sortBy, setSortBy }) => (
@@ -219,7 +228,7 @@ const Actions = ({ calculateDailyTotal, groupByTable, exportDailyTotal, exportDa
     <button 
       onClick={async () => {
         const data = await syncBills();
-        showNotification(`Factures actualisées : ${data.length} facture(s) chargée(s)`);
+        showNotification(`Factures actualisées : ${data.length} facture(s) chargée(s)`, 'success');
         if (activeView === 'dailyTotal') {
           calculateDailyTotal();
         }
@@ -395,342 +404,273 @@ const BillCard = ({ bill, currency, onEdit }) => {
           </div>
         ))}
       </div>
-      <div className={styles.invoiceSummary}>
-        <div><span>Sous-total:</span> {formatCurrency(bill.totalBillAmount)}</div>
-        <div><span>TVA (10%):</span> {formatCurrency(bill.totalBillAmount * 0.1)}</div>
-        <div className={styles.summaryRowTotal}><span>TOTAL:</span> {formatCurrency(bill.totalBillAmount * 1.1)}</div>
+      <div className={styles.totalSection}>
+        <div className={styles.totalRow}>
+          <span>Sous-total:</span>
+          <span>{formatCurrency(bill.totalBillAmount)}</span>
+        </div>
+        <div className={styles.totalRow}>
+          <span>TVA (10%):</span>
+          <span>{formatCurrency(bill.totalBillAmount * 0.1)}</span>
+        </div>
+        <div className={`${styles.totalRow} ${styles.grandTotal}`}> 
+          <span>TOTAL:</span>
+          <span>{formatCurrency(bill.totalBillAmount * 1.1)}</span>
+        </div>
       </div>
-      <div className={styles.invoiceFooter}>
-        <div>Merci pour votre visite ! À bientôt</div>
-        <div className={styles.cardActions}>
-          <button onClick={printInvoice} className={styles.cardButton} aria-label={`Imprimer facture #${bill.id}`}>
-            <FaPrint /> Imprimer
+      <div className={styles.cardActions}>
+        <button onClick={printInvoice} className={styles.printButton}>
+          <FaPrint /> Imprimer
+        </button>
+        {onEdit && (
+          <button 
+            onClick={() => onEdit(bill)} 
+            className={styles.cardButton} 
+            aria-label={`Modifier facture #${bill.id}`}
+          >
+            <FaEdit /> Modifier Facture
           </button>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
-// Main ListeCommandes component
-const ListeCommandes = ({ storageKey = 'allBills', currency = 'DT', onEdit }) => {
-  const { bills, isLoading, error, wsError, fetchBills, syncBills } = useBills(storageKey);
-  const [dailyTotal, setDailyTotal] = useState(0);
-  const [dailyDetails, setDailyDetails] = useState([]);
-  const [sortBy, setSortBy] = useState('date-desc');
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
-  const [tableFilter, setTableFilter] = useState('');
-  const [notification, setNotification] = useState(null);
-  const [activeView, setActiveView] = useState('bills');
-  const [showGrandTotal, setShowGrandTotal] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // Show notification
-  const showNotification = useCallback((message, type = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  }, []);
-
-  // Calculate daily total with VAT
-  const calculateDailyTotal = useCallback(() => {
-    const selectedDate = new Date(dateFilter).toISOString().split('T')[0];
-    const filteredBills = bills.filter(bill => 
-      bill.orders.some(order => new Date(order.date).toISOString().split('T')[0] === selectedDate)
-    );
-    const total = filteredBills.reduce((sum, bill) => sum + (bill.totalBillAmount * 1.1), 0);
-    setDailyTotal(total);
-    setDailyDetails(filteredBills);
-    setActiveView('dailyTotal');
-    showNotification(`Total journalier: ${formatCurrency(total)}`);
-  }, [bills, dateFilter, showNotification]);
-
-  // Group by table
-  const groupByTable = useCallback(() => setActiveView('tables'), []);
-
-  // Export daily total as JSON
-  const exportDailyTotal = useCallback(() => {
-    const data = { 
-      date: dateFilter, 
-      total: dailyTotal, 
-      bills: dailyDetails.map(bill => ({
-        id: bill.id,
-        tableNumber: bill.tableNumber,
-        totalBillAmount: bill.totalBillAmount,
-        orders: bill.orders
-      }))
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `daily_total_${dateFilter}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification('Exportation JSON réussie');
-  }, [dateFilter, dailyTotal, dailyDetails, showNotification]);
-
-  // Export daily total as PDF
-  const exportDailyTotalPDF = useCallback(() => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text('Crêperie 30.8 - Rapport Journalier', 20, 20);
-    doc.setFontSize(12);
-    doc.text('123 Avenue des Gastronomes, 75001 Paris', 20, 30);
-    doc.text('Tél: 00216 23 587 726 • creperie30.8@gamail.com', 20, 35);
-    doc.text(`Date: ${dateFilter}`, 20, 45);
-    doc.text(`Total Journalier: ${formatCurrency(dailyTotal)}`, 20, 50);
-
-    doc.autoTable({
-      startY: 60,
-      head: [['N° Facture', 'Table', 'Commandes', 'Sous-total', 'TVA (10%)', 'Total']],
-      body: dailyDetails.map(bill => [
-        bill.id.slice(0, 8),
-        bill.tableNumber,
-        bill.orders.map(order => `Commande #${order.id.slice(0, 8)}: ${order.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}`).join('; '),
-        formatCurrency(bill.totalBillAmount),
-        formatCurrency(bill.totalBillAmount * 0.1),
-        formatCurrency(bill.totalBillAmount * 1.1)
-      ]),
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
-      margin: { top: 60 }
-    });
-
-    doc.text('Merci pour votre visite ! À bientôt', 20, doc.lastAutoTable.finalY + 20);
-    doc.save(`daily_total_${dateFilter}.pdf`);
-    showNotification('Exportation PDF réussie');
-  }, [dateFilter, dailyTotal, dailyDetails, showNotification]);
-
-  // Print daily total
-  const printDailyTotal = useCallback(() => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Rapport Journalier - ${dateFilter}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          .report-container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #ccc; }
-          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .restaurant-info { text-align: left; }
-          .restaurant-name { font-size: 24px; font-weight: bold; }
-          .restaurant-details { font-size: 12px; }
-          .report-title { font-size: 28px; font-weight: bold; }
-          .report-info { margin: 20px 0; }
-          .info-row { margin: 5px 0; }
-          .info-label { font-weight: bold; margin-right: 5px; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f5f5f5; }
-          .summary { text-align: right; margin-top: 20px; }
-          .summary-row { margin: 5px 0; }
-          .total-row { font-weight: bold; font-size: 18px; border-top: 2px solid #000; padding-top: 10px; }
-          .footer { text-align: center; margin-top: 20px; font-style: italic; }
-        </style>
-      </head>
-      <body>
-        <div class="report-container">
-          <div class="header">
-            <div class="restaurant-info">
-              <div class="restaurant-name">Crêperie 30.8</div>
-              <div class="restaurant-details">123 Avenue des Gastronomes, 75001 Paris<br>Tél: 00216 23 587 726 • creperie30.8@gamail.com</div>
-            </div>
-            <div class="report-title">RAPPORT JOURNALIER</div>
-          </div>
-          <div class="report-info">
-            <div class="info-row"><span class="info-label">Date:</span>${dateFilter}</div>
-            <div class="info-row"><span class="info-label">Total Journalier:</span>${formatCurrency(dailyTotal)}</div>
-            <div class="info-row"><span class="info-label">Nombre de factures:</span>${dailyDetails.length}</div>
-          </div>
-          <table>
-            <thead><tr><th>N° Facture</th><th>Table</th><th>Commandes</th><th>Sous-total</th><th>TVA (10%)</th><th>Total</th></tr></thead>
-            <tbody>${dailyDetails.map(bill => `
-              <tr>
-                <td>${bill.id.slice(0, 8)}</td>
-                <td>${bill.tableNumber}</td>
-                <td>${bill.orders.map(order => `Commande #${order.id.slice(0, 8)}: ${order.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}`).join('; ')}</td>
-                <td>${formatCurrency(bill.totalBillAmount)}</td>
-                <td>${formatCurrency(bill.totalBillAmount * 0.1)}</td>
-                <td>${formatCurrency(bill.totalBillAmount * 1.1)}</td>
-              </tr>
-            `).join('')}</tbody>
-          </table>
-          <div class="summary">
-            <div class="summary-row total-row"><span>TOTAL JOURNALIER:</span>${formatCurrency(dailyTotal)}</div>
-          </div>
-          <div class="footer"><p>Merci pour votre visite ! À bientôt</p></div>
-        </div>
-        <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 1000); };</script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-  }, [dateFilter, dailyTotal, dailyDetails]);
-
-  // Reset localStorage
-  const resetLocalStorage = useCallback(() => {
-    if (window.confirm('Voulez-vous réinitialiser les données de session ? Les factures seront conservées.')) {
-      localStorage.removeItem('sessionBills');
-      localStorage.removeItem('currentBillId');
-      // Preserve allBills to ensure permanent storage
-      fetchBills().then(() => {
-        showNotification('Données de session réinitialisées, factures conservées');
-        setActiveView('bills');
-        setRefreshKey(prev => prev + 1);
-      });
-    }
-  }, [fetchBills, showNotification]);
-
-  // Filter and sort bills
-  const filteredAndSortedBills = useMemo(() => {
-    let result = [...bills];
-    if (tableFilter) result = result.filter(bill => bill.tableNumber.toString().includes(tableFilter));
-    return result.sort((a, b) => {
-      const aDate = a.orders[0]?.date ? new Date(a.orders[0].date) : new Date();
-      const bDate = b.orders[0]?.date ? new Date(b.orders[0].date) : new Date();
-      if (sortBy === 'date-desc') return bDate - aDate;
-      if (sortBy === 'date-asc') return aDate - bDate;
-      if (sortBy === 'total-desc') return (b.totalBillAmount * 1.1) - (a.totalBillAmount * 1.1);
-      if (sortBy === 'total-asc') return (a.totalBillAmount * 1.1) - (b.totalBillAmount * 1.1);
-      return 0;
-    });
-  }, [bills, sortBy, tableFilter, refreshKey]);
-
-  // Group bills by table
-  const groupedByTable = useMemo(() => {
-    return bills.reduce((acc, bill) => {
-      acc[bill.tableNumber] = acc[bill.tableNumber] || [];
-      acc[bill.tableNumber].push(bill);
-      return acc;
-    }, {});
-  }, [bills, refreshKey]);
-
-  // Calculate table totals with VAT
-  const tableTotals = useMemo(() => {
-    return Object.keys(groupedByTable).reduce((acc, table) => {
-      acc[table] = groupedByTable[table].reduce((sum, bill) => sum + (bill.totalBillAmount * 1.1), 0);
-      return acc;
-    }, {});
-  }, [groupedByTable, refreshKey]);
-
-  // Calculate stats with VAT
-  const billStats = useMemo(() => ({
-    totalBills: bills.length,
-    totalRevenue: bills.reduce((sum, bill) => sum + (bill.totalBillAmount * 1.1), 0),
-    tablesServed: [...new Set(bills.map(bill => bill.tableNumber))].length
-  }), [bills, refreshKey]);
-
-  // Periodic sync
-  useEffect(() => {
-    fetchBills().then(data => {
-      console.log('Initial load bills:', data);
-    });
-    const interval = setInterval(() => {
-      syncBills();
-    }, 300000); // Sync every 5 minutes
-    return () => clearInterval(interval);
-  }, [fetchBills, syncBills]);
-
-  return (
-    <div className={styles.container}>
-      {notification && <Notification message={notification.message} type={notification.type} />}
-      {wsError && <Notification message={wsError} type="error" />}
-      <div className={styles.header}>
-        <h1 className={styles.title}><FaTable /> Historique des Factures</h1>
-        <Stats stats={billStats} currency={currency} onShowGrandTotal={() => setShowGrandTotal(true)} />
-      </div>
-      {showGrandTotal && <GrandTotalSection stats={billStats} currency={currency} onClose={() => setShowGrandTotal(false)} />}
-      <div className={styles.controlsSection}>
-        <Filters 
-          dateFilter={dateFilter} 
-          setDateFilter={setDateFilter} 
-          tableFilter={tableFilter} 
-          setTableFilter={setTableFilter} 
-          sortBy={sortBy} 
-          setSortBy={setSortBy} 
-        />
-        <Actions 
-          calculateDailyTotal={calculateDailyTotal} 
-          groupByTable={groupByTable} 
-          exportDailyTotal={exportDailyTotal}
-          exportDailyTotalPDF={exportDailyTotalPDF}
-          printDailyTotal={printDailyTotal}
-          resetLocalStorage={resetLocalStorage} 
-          activeView={activeView} 
-          syncBills={syncBills}
-          showNotification={showNotification}
-        />
-      </div>
-      {activeView === 'bills' && (
-        <div className={styles.billsSection}>
-          <h2>Toutes les Factures ({filteredAndSortedBills.length})</h2>
-          {filteredAndSortedBills.length === 0 ? (
-            <div className={styles.emptyMessage}>Aucune facture trouvée</div>
-          ) : (
-            <div className={styles.billsGrid}>
-              {filteredAndSortedBills.map(bill => (
-                <BillCard 
-                  key={bill.id} 
-                  bill={bill} 
-                  currency={currency} 
-                  onEdit={onEdit} 
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      {activeView === 'dailyTotal' && (
-        <div className={styles.dailyTotalSection}>
-          <h2>Factures du Jour ({dateFilter}) - {formatCurrency(dailyTotal)}</h2>
-          {dailyDetails.length === 0 ? (
-            <div className={styles.emptyMessage}>Aucune facture pour cette date</div>
-          ) : (
-            <div className={styles.billsGrid}>
-              {dailyDetails.map(bill => (
-                <BillCard 
-                  key={bill.id} 
-                  bill={bill} 
-                  currency={currency} 
-                  onEdit={onEdit} 
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      {activeView === 'tables' && (
-        <div className={styles.tablesSection}>
-          <h2>Factures par Table</h2>
-          <div className={styles.tablesContainer}>
-            {Object.entries(groupedByTable).sort().map(([table, bills]) => (
-              <div key={table} className={styles.tableGroup}>
-                <div className={styles.tableHeader}>Table {table} - {formatCurrency(tableTotals[table])}</div>
-                <div className={styles.billsGrid}>
-                  {bills.map(bill => (
-                    <BillCard 
-                      key={bill.id} 
-                      bill={bill} 
-                      currency={currency} 
-                      onEdit={onEdit} 
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-ListeCommandes.propTypes = {
-  storageKey: PropTypes.string,
-  currency: PropTypes.string,
+BillCard.propTypes = {
+  bill: PropTypes.object.isRequired,
+  currency: PropTypes.string.isRequired,
   onEdit: PropTypes.func,
 };
 
+// Main component
+const ListeCommandes = () => {
+  const [notification, setNotification] = useState(null);
+  const showNotification = useCallback((message, type = 'info') => {
+    setNotification({ message, type });
+  }, []);
+
+  const { bills, isLoading, error, wsError, fetchBills, syncBills } = useBills('creperieBills', showNotification);
+  const [dateFilter, setDateFilter] = useState('');
+  const [tableFilter, setTableFilter] = useState('');
+  const [sortBy, setSortBy] = useState('date-desc');
+  const [activeView, setActiveView] = useState('allBills'); // 'allBills', 'dailyTotal', 'tableSummary'
+  const [dailyTotal, setDailyTotal] = useState(0);
+  const [tableSummary, setTableSummary] = useState({});
+  const [showGrandTotal, setShowGrandTotal] = useState(false);
+
+  useEffect(() => {
+    fetchBills();
+  }, [fetchBills]);
+
+  const filteredBills = useMemo(() => {
+    let filtered = bills;
+
+    if (dateFilter) {
+      filtered = filtered.filter(bill => {
+        const billDate = new Date(bill.orders[0]?.date || bill.createdAt).toISOString().split('T')[0];
+        return billDate === dateFilter;
+      });
+    }
+
+    if (tableFilter) {
+      filtered = filtered.filter(bill =>
+        String(bill.tableNumber).includes(tableFilter)
+      );
+    }
+
+    // Sort bills
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.orders[0]?.date || a.createdAt);
+      const dateB = new Date(b.orders[0]?.date || b.createdAt);
+      const totalA = a.totalBillAmount;
+      const totalB = b.totalBillAmount;
+
+      switch (sortBy) {
+        case 'date-desc':
+          return dateB - dateA;
+        case 'date-asc':
+          return dateA - dateB;
+        case 'total-desc':
+          return totalB - totalA;
+        case 'total-asc':
+          return totalA - totalB;
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [bills, dateFilter, tableFilter, sortBy]);
+
+  const calculateDailyTotal = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const total = bills.reduce((sum, bill) => {
+      const billDate = new Date(bill.orders[0]?.date || bill.createdAt).toISOString().split('T')[0];
+      return billDate === today ? sum + bill.totalBillAmount : sum;
+    }, 0);
+    setDailyTotal(total);
+    setActiveView('dailyTotal');
+    showNotification(`Total journalier calculé : ${formatCurrency(total)}`, 'info');
+  }, [bills, showNotification]);
+
+  const groupByTable = useCallback(() => {
+    const summary = bills.reduce((acc, bill) => {
+      acc[bill.tableNumber] = (acc[bill.tableNumber] || 0) + bill.totalBillAmount;
+      return acc;
+    }, {});
+    setTableSummary(summary);
+    setActiveView('tableSummary');
+    showNotification('Résumé par table généré', 'info');
+  }, [bills, showNotification]);
+
+  const exportData = useCallback((data, filename, type) => {
+    const blob = new Blob([data], { type: `application/${type}` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotification(`Données exportées vers ${filename}`, 'success');
+  }, [showNotification]);
+
+  const exportDailyTotal = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const dailyBills = bills.filter(bill => new Date(bill.orders[0]?.date || bill.createdAt).toISOString().split('T')[0] === today);
+    exportData(JSON.stringify(dailyBills, null, 2), `daily_total_${today}.json`, 'json');
+  }, [bills, exportData]);
+
+  const exportDailyTotalPDF = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const dailyBills = bills.filter(bill => new Date(bill.orders[0]?.date || bill.createdAt).toISOString().split('T')[0] === today);
+
+    const doc = new jsPDF();
+    doc.text(`Rapport Journalier - ${today}`, 14, 20);
+    
+    const tableColumn = ["Facture ID", "Table", "Montant Total"];
+    const tableRows = [];
+
+    dailyBills.forEach(bill => {
+      tableRows.push([
+        bill.id.slice(0, 8),
+        bill.tableNumber,
+        formatCurrency(bill.totalBillAmount)
+      ]);
+    });
+
+    doc.autoTable(tableColumn, tableRows, { startY: 30 });
+    doc.text(`Total des ventes du jour: ${formatCurrency(dailyTotal)}`, 14, doc.autoTable.previous.finalY + 10);
+    doc.save(`daily_report_${today}.pdf`);
+    showNotification(`Rapport PDF exporté : daily_report_${today}.pdf`, 'success');
+  }, [bills, dailyTotal, showNotification, exportData]);
+
+  const printDailyTotal = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const printContent = `
+      <h1>Rapport Journalier - ${today}</h1>
+      <p>Total des ventes du jour: ${formatCurrency(dailyTotal)}</p>
+      <h2>Détail des factures:</h2>
+      ${bills.filter(bill => new Date(bill.orders[0]?.date || bill.createdAt).toISOString().split('T')[0] === today).map(bill => `
+        <div>
+          <h3>Facture #${bill.id.slice(0, 8)} - Table ${bill.tableNumber}</h3>
+          <p>Montant: ${formatCurrency(bill.totalBillAmount)}</p>
+        </div>
+      `).join('')}
+    `;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+    showNotification('Impression du rapport journalier', 'info');
+  }, [bills, dailyTotal, showNotification]);
+
+  const totalRevenue = useMemo(() => {
+    return bills.reduce((sum, bill) => sum + bill.totalBillAmount, 0);
+  }, [bills]);
+
+  const totalTablesServed = useMemo(() => {
+    const uniqueTables = new Set(bills.map(bill => bill.tableNumber));
+    return uniqueTables.size;
+  }, [bills]);
+
+  const stats = useMemo(() => ({
+    totalBills: bills.length,
+    totalRevenue: totalRevenue,
+    tablesServed: totalTablesServed,
+  }), [bills.length, totalRevenue, totalTablesServed]);
+
+  return (
+    <div className={styles.listeCommandesContainer}>
+      {notification && (
+        <Notification 
+          message={notification.message} 
+          type={notification.type} 
+          onClose={() => setNotification(null)} 
+        />
+      )}
+      <h1>Historique des Factures</h1>
+      {isLoading && <p>Chargement des factures...</p>}
+      {error && <p className={styles.error}>{error}</p>}
+      {wsError && <p className={styles.error}>{wsError}</p>}
+
+      <Stats stats={stats} currency="DT" onShowGrandTotal={() => setShowGrandTotal(true)} />
+
+      {showGrandTotal && (
+        <GrandTotalSection 
+          stats={stats} 
+          currency="DT" 
+          onClose={() => setShowGrandTotal(false)} 
+        />
+      )}
+
+      <Filters 
+        dateFilter={dateFilter} 
+        setDateFilter={setDateFilter} 
+        tableFilter={tableFilter} 
+        setTableFilter={setTableFilter} 
+        sortBy={sortBy} 
+        setSortBy={setSortBy} 
+      />
+
+      <Actions 
+        calculateDailyTotal={calculateDailyTotal} 
+        groupByTable={groupByTable} 
+        exportDailyTotal={exportDailyTotal} 
+        exportDailyTotalPDF={exportDailyTotalPDF}
+        printDailyTotal={printDailyTotal}
+        activeView={activeView}
+        syncBills={syncBills}
+        showNotification={showNotification}
+      />
+
+      <div className={styles.billList}>
+        <h2>
+          {activeView === 'allBills' && `Toutes les Factures (${filteredBills.length})`}
+          {activeView === 'dailyTotal' && `Total Journalier du ${new Date().toLocaleDateString()} : ${formatCurrency(dailyTotal)}`}
+          {activeView === 'tableSummary' && 'Résumé par Table'}
+        </h2>
+
+        {activeView === 'allBills' && filteredBills.length === 0 && <p>Aucune facture trouvée</p>}
+        {activeView === 'dailyTotal' && filteredBills.length === 0 && <p>Aucune facture pour aujourd'hui</p>}
+        {activeView === 'tableSummary' && Object.keys(tableSummary).length === 0 && <p>Aucun résumé par table</p>}
+
+        {activeView === 'allBills' && filteredBills.map(bill => (
+          <BillCard key={bill.id} bill={bill} currency="DT" />
+        ))}
+
+        {activeView === 'tableSummary' && Object.entries(tableSummary).map(([table, total]) => (
+          <div key={table} className={styles.tableSummaryCard}>
+            <h3>Table {table}</h3>
+            <p>Total: {formatCurrency(total)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default ListeCommandes;
+
+
