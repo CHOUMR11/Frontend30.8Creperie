@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaArrowLeft } from 'react-icons/fa';
 import Decimal from 'decimal.js';
-import Header from '../common/Header';
-import Footer from '../common/Footer';
 import styles from './Panier.module.css';
 import { postOrder } from '../../services/api';
 
@@ -261,8 +259,6 @@ export default function Panier() {
 
   return (
     <div className={styles.panierContainer}>
-      <Header />
-      <ToastContainer />
       <div className={styles.content}>
         <div className={styles.header}>
           <button onClick={() => navigate('/client/menu')} className={styles.backButton}>
@@ -321,7 +317,6 @@ export default function Panier() {
           </>
         )}
       </div>
-      <Footer />
     </div>
   );
 }

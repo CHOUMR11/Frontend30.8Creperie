@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getMenu } from '../../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import Decimal from 'decimal.js';
 import { debounce } from 'lodash';
-import Header from '../common/Header';
-import Footer from '../common/Footer';
 import styles from './Menu.module.css';
 
 // Import des images locales pour les catégories
@@ -286,9 +284,8 @@ export default function Menu() {
   if (!tableConfirmed) {
     return (
       <div className={styles.container}>
-        <Header tableNumber={tableNumber} cartCount={cartCount} />
         <div className={styles.tableSelectionCard}>
-          <h2 className={styles.title}>Choisissez votre numéro de table</h2>
+          <h2 className={styles.title}>Choisissez votre numero de table</h2>
           <input
             type="number"
             value={tableNumber}
@@ -296,23 +293,17 @@ export default function Menu() {
             min="1"
             max="999"
             className={styles.tableInput}
-            placeholder="Numéro de table"
-            aria-label="Numéro de table"
+            placeholder="Numero de table"
+            aria-label="Numero de table"
           />
           <button
             onClick={confirmTable}
             className={styles.confirmButton}
-            aria-label="Valider le numéro de table"
+            aria-label="Valider le numero de table"
           >
             Valider
           </button>
         </div>
-        <Footer />
-        <ToastContainer
-          position="bottom-right"
-          autoClose={3000}
-          toastStyle={{ backgroundColor: colors.dark, color: colors.white }}
-        />
       </div>
     );
   }
@@ -320,7 +311,6 @@ export default function Menu() {
   // Menu display screen
   return (
     <div className={styles.menuContainer}>
-      <Header tableNumber={tableNumber} cartCount={cartCount} />
       <main className={styles.mainContent}>
         {!selectedCategory ? (
           <div className={styles.categorySection}>
@@ -522,12 +512,6 @@ export default function Menu() {
           Quitter la table
         </button>
       </div>
-      <Footer />
-      <ToastContainer
-        position="bottom-right"
-        autoClose={3000}
-        toastStyle={{ backgroundColor: colors.dark, color: colors.white }}
-      />
     </div>
   );
 }
