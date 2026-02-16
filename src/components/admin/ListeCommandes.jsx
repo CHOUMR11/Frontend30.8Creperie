@@ -1,209 +1,314 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { getOrders } from '../../services/api';
 import styles from './ListeCommandes.module.css';
-import { FaSync } from 'react-icons/fa';
-import api from '../../services/api';
-
-// Utility function to calculate total from items
-const calculateCommandTotal = (items) => {
-  return items.reduce((sum, item) => {
-    const price = Number(item.price) || 0;
-    const quantity = Number(item.quantity) || 0;
-    return sum + price * quantity;
-  }, 0);
-};
 
 // Utility function to format currency as XX.XXX DT
 const formatCurrency = (amount) => {
   return `${Number(amount).toFixed(3)} DT`;
 };
 
-// Notification component
-const Notification = ({ message, type, onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onClose();
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  return (
-    <div className={`${styles.notification} ${type === 'error' ? styles.notificationError : styles.notificationSuccess}`}>
-      {message}
-    </div>
-  );
-};
-Notification.propTypes = {
-    message: PropTypes.string.isRequired,
-    type: PropTypes.oneOf(['success', 'error']).isRequired,
-    onClose: PropTypes.func.isRequired,
+// Calculate total for an order's items
+const calculateOrderTotal = (items) => {
+  return items.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    const quantity = Number(item.quantity) || 1;
+    return sum + price * quantity;
+  }, 0);
 };
 
+// Group orders by table number
+const groupOrdersByTable = (orders) => {
+  const grouped = {};
+  orders.forEach((order) => {
+    const table = order.tableNumber || 'Inconnue';
+    if (!grouped[table]) {
+      grouped[table] = [];
+    }
+    grouped[table].push(order);
+  });
+  return grouped;
+};
 
-// Custom hook for managing bills from the backend
-const useBills = (showNotification) => {
-  const [bills, setBills] = useState([]);
+export default function ListeCommandes() {
+  const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [wsError, setWsError] = useState(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
 
-  // Validate bill structure
-  const validateBill = (bill) => {
-    return bill && bill.id && Array.isArray(bill.orders) && bill.tableNumber;
-  };
-
-  // Fetch bills from backend
-  const fetchBills = useCallback(async () => {
+  // Fetch orders from backend via the centralized api service
+  const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${api.defaults.baseURL}/api/orders`);
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
-      const orders = await response.json();
-      const transformedData = orders.map(order => ({
-        id: order._id.toString(),
-        tableNumber: order.tableNumber,
-        orders: [{
-          id: order._id.toString(),
-          date: order.createdAt,
-          items: order.items.map(item => ({
-            name: item.menuItem ? item.menuItem.name : 'Article supprimé',
-            price: item.menuItem ? item.menuItem.price : 0,
-            quantity: item.quantity
-          })),
-          totalPrice: calculateCommandTotal(order.items.map(item => ({...item, price: item.menuItem ? item.menuItem.price : 0})))
-        }],
-        totalBillAmount: calculateCommandTotal(order.items.map(item => ({...item, price: item.menuItem ? item.menuItem.price : 0})))
-      }));
-      
-      const validBills = transformedData.filter(validateBill);
-      setBills(validBills);
       setError(null);
-      return validBills;
+      const response = await getOrders();
+      const data = response.data;
+
+      // Handle different response formats
+      let rawOrders = [];
+      if (Array.isArray(data)) {
+        rawOrders = data;
+      } else if (data && Array.isArray(data.data)) {
+        rawOrders = data.data;
+      } else if (data && Array.isArray(data.orders)) {
+        rawOrders = data.orders;
+      }
+
+      // Normalize orders
+      const normalized = rawOrders.map((order) => ({
+        id: order._id || order.id,
+        tableNumber: order.tableNumber,
+        createdAt: order.createdAt || order.date || new Date().toISOString(),
+        status: order.status || 'pending',
+        items: (order.items || []).map((item) => ({
+          name: item.menuItem?.name || item.name || 'Article',
+          price: item.menuItem?.price || item.price || 0,
+          quantity: item.quantity || 1,
+        })),
+      }));
+
+      // Sort by date, newest first
+      normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      setOrders(normalized);
     } catch (err) {
-      console.error('Erreur lors du chargement des factures:', err);
-      setError('Erreur lors du chargement des factures depuis le backend.');
-      showNotification('Impossible de charger les factures. Vérifiez la console pour les erreurs.', 'error');
-      setBills([]);
-      return [];
+      console.error('Erreur chargement commandes:', err);
+      setError('Impossible de charger les commandes. Verifiez la connexion au serveur.');
     } finally {
       setIsLoading(false);
     }
-  }, [showNotification]);
+  }, []);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://backendmenu-3.onrender.com/ws';
+    const wsUrl =
+      import.meta.env.VITE_WS_URL || 'wss://backendmenu-3.onrender.com/ws';
 
-    let ws;
     const connectWebSocket = () => {
-      ws = new WebSocket(wsUrl);
+      // Clean up any existing connection
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
 
-      ws.onopen = () => {
-        console.log('Connexion WebSocket établie.');
-        setWsError(null);
-        showNotification('Connecté au serveur en temps réel.', 'success');
-        fetchBills(); // Fetch initial data on connect
-      };
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message.type === 'orders' && Array.isArray(message.data)) {
-            const updatedBills = message.data.filter(validateBill);
-            setBills(updatedBills);
-            showNotification('Liste des commandes mise à jour.', 'success');
-          } else if (message.type === 'error') {
-            console.error('Erreur WebSocket reçue:', message.message);
-            setWsError(message.message);
-            showNotification(message.message, 'error');
+        ws.onopen = () => {
+          console.log('[v0] WebSocket connecte');
+          setWsConnected(true);
+          // Fetch fresh data when WS connects
+          fetchOrders();
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('[v0] WS message recu:', message.type);
+
+            if (message.type === 'orders' && Array.isArray(message.data)) {
+              // The server pushes updated orders
+              const normalized = message.data.map((order) => ({
+                id: order._id || order.id,
+                tableNumber: order.tableNumber,
+                createdAt: order.createdAt || order.date || new Date().toISOString(),
+                status: order.status || 'pending',
+                items: (order.items || []).map((item) => ({
+                  name: item.menuItem?.name || item.name || 'Article',
+                  price: item.menuItem?.price || item.price || 0,
+                  quantity: item.quantity || 1,
+                })),
+              }));
+              normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+              setOrders(normalized);
+            } else if (message.type === 'new_order' || message.type === 'order') {
+              // A single new order was received, refetch all
+              fetchOrders();
+            }
+          } catch (parseErr) {
+            console.error('[v0] Erreur parsing WS message:', parseErr);
           }
-        } catch (error) {
-          console.error('Erreur de traitement du message WebSocket:', error);
-          setWsError('Erreur de données WebSocket.');
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        console.log('Connexion WebSocket fermée. Tentative de reconnexion...');
-        showNotification('Connexion temps réel perdue. Tentative de reconnexion...', 'error');
-        setTimeout(connectWebSocket, 5000);
-      };
+        ws.onclose = () => {
+          console.log('[v0] WebSocket ferme, reconnexion dans 5s...');
+          setWsConnected(false);
+          reconnectTimerRef.current = setTimeout(connectWebSocket, 5000);
+        };
 
-      ws.onerror = (error) => {
-        console.error('Erreur de connexion WebSocket:', error);
-        setWsError('Erreur de connexion WebSocket.');
-        showNotification('Erreur de connexion WebSocket.', 'error');
-      };
+        ws.onerror = (err) => {
+          console.error('[v0] WebSocket erreur:', err);
+          setWsConnected(false);
+        };
+      } catch (err) {
+        console.error('[v0] Erreur creation WebSocket:', err);
+        setWsConnected(false);
+        reconnectTimerRef.current = setTimeout(connectWebSocket, 5000);
+      }
     };
 
+    // Initial fetch + WS connection
+    fetchOrders();
     connectWebSocket();
 
     return () => {
-      if (ws) {
-        ws.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
       }
     };
-  }, [fetchBills, showNotification]);
+  }, [fetchOrders]);
 
-  return { bills, isLoading, error, wsError, fetchBills };
-};
+  // Group orders by table
+  const groupedOrders = groupOrdersByTable(orders);
+  const tableNumbers = Object.keys(groupedOrders).sort(
+    (a, b) => Number(a) - Number(b)
+  );
 
-// Main Component
-export default function ListeCommandes() {
-  const [notification, setNotification] = useState(null);
-  const showNotification = useCallback((message, type) => {
-    setNotification({ message, type });
-  }, []);
-
-  const { bills, isLoading, error, wsError, fetchBills } = useBills(showNotification);
-
-  // Le reste du composant (Filters, Actions, Stats, etc.) reste identique
-  // ...
+  // Calculate grand total
+  const grandTotal = orders.reduce((total, order) => {
+    return total + calculateOrderTotal(order.items);
+  }, 0);
 
   return (
     <div className={styles.container}>
-        {notification && (
-            <Notification 
-                message={notification.message} 
-                type={notification.type} 
-                onClose={() => setNotification(null)} 
-            />
-        )}
-        <h1>Liste des Commandes</h1>
-        {isLoading && <p>Chargement des commandes...</p>}
-        {error && <p className={styles.error}>{error}</p>}
-        {wsError && <p className={styles.error}>Erreur WebSocket: {wsError}</p>}
-        
-        <button onClick={fetchBills} disabled={isLoading}>
-            <FaSync /> Actualiser
-        </button>
-
-        <div className={styles.billsGrid}>
-            {bills.length > 0 ? (
-                bills.map(bill => (
-                    <div key={bill.id} className={styles.billCard}>
-                        <h3>Table {bill.tableNumber}</h3>
-                        <p>Total: {formatCurrency(bill.totalBillAmount)}</p>
-                        <div>
-                            {bill.orders.map(order => (
-                                <div key={order.id}>
-                                    <h4>Commande du {new Date(order.date).toLocaleTimeString()}</h4>
-                                    <ul>
-                                        {order.items.map((item, index) => (
-                                            <li key={index}>{item.quantity}x {item.name} - {formatCurrency(item.price)}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))
-            ) : (
-                !isLoading && <p>Aucune commande à afficher.</p>
-            )}
+      {/* Header */}
+      <div className={styles.header}>
+        <h1 className={styles.title}>Commandes</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: wsConnected ? '#4caf50' : '#f44336',
+            }}
+            title={wsConnected ? 'Connecte en temps reel' : 'Deconnecte'}
+          />
+          <button
+            onClick={fetchOrders}
+            disabled={isLoading}
+            className={styles.actionButton}
+            style={{
+              backgroundColor: '#0275d8',
+              color: 'white',
+              opacity: isLoading ? 0.6 : 1,
+            }}
+          >
+            {isLoading ? 'Chargement...' : 'Actualiser'}
+          </button>
         </div>
+      </div>
+
+      {/* Error */}
+      {error && <p className={styles.error}>{error}</p>}
+
+      {/* Stats bar */}
+      <div className={styles.statsContainer}>
+        <div className={styles.statCard}>
+          <div className={styles.statValue}>{orders.length}</div>
+          <div className={styles.statLabel}>Commandes</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statValue}>{tableNumbers.length}</div>
+          <div className={styles.statLabel}>Tables</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statValue}>{formatCurrency(grandTotal)}</div>
+          <div className={styles.statLabel}>Total General</div>
+        </div>
+      </div>
+
+      {/* Loading */}
+      {isLoading && orders.length === 0 && (
+        <div className={styles.loadingContainer}>
+          <p>Chargement des commandes...</p>
+        </div>
+      )}
+
+      {/* No orders */}
+      {!isLoading && orders.length === 0 && !error && (
+        <div className={styles.emptyMessage}>
+          <p>Aucune commande pour le moment.</p>
+        </div>
+      )}
+
+      {/* Orders grouped by table */}
+      {tableNumbers.length > 0 && (
+        <div className={styles.tablesContainer}>
+          {tableNumbers.map((tableNum) => {
+            const tableOrders = groupedOrders[tableNum];
+            const tableTotal = tableOrders.reduce(
+              (sum, order) => sum + calculateOrderTotal(order.items),
+              0
+            );
+
+            return (
+              <div key={tableNum} className={styles.tableGroup}>
+                <div className={styles.tableHeader}>
+                  Table {tableNum} &mdash; {tableOrders.length} commande
+                  {tableOrders.length > 1 ? 's' : ''} &mdash; Total:{' '}
+                  {formatCurrency(tableTotal)}
+                </div>
+
+                <div className={styles.commandesGrid}>
+                  {tableOrders.map((order) => {
+                    const orderTotal = calculateOrderTotal(order.items);
+                    return (
+                      <div key={order.id} className={styles.commandeCard}>
+                        <div className={styles.invoiceHeader}>
+                          <span className={styles.invoiceTitle}>
+                            Commande
+                          </span>
+                          <span style={{ fontSize: '0.85rem', color: '#777' }}>
+                            {new Date(order.createdAt).toLocaleString('fr-FR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+
+                        <div className={styles.itemsHeader}>
+                          <span>Article</span>
+                          <span>Qte</span>
+                          <span>Prix</span>
+                          <span>Sous-total</span>
+                        </div>
+
+                        <div className={styles.itemsContainer}>
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className={styles.itemRow}>
+                              <span>{item.name}</span>
+                              <span>{item.quantity}</span>
+                              <span>{formatCurrency(item.price)}</span>
+                              <span>
+                                {formatCurrency(item.price * item.quantity)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className={styles.invoiceSummary}>
+                          <div className={styles.summaryRowTotal}>
+                            Total: {formatCurrency(orderTotal)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

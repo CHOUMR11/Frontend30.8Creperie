@@ -21,7 +21,7 @@ const formatCurrency = (amount) => {
   return `${Number(amount).toFixed(3)} DT`;
 };
 
-// Advanced storage utility with validation and error handling
+// Storage utility with error handling
 const storage = {
   get: key => {
     try {
@@ -29,59 +29,45 @@ const storage = {
       return data ? JSON.parse(data) : null;
     } catch (error) {
       console.error(`Error reading ${key} from localStorage:`, error);
-      toast.error('Erreur lors de la lecture des données.', { autoClose: 2000 });
       return null;
     }
   },
   set: (key, value) => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-      console.log(`Saved ${key} to localStorage:`, value);
     } catch (error) {
       console.error(`Error writing ${key} to localStorage:`, error);
-      toast.error('Erreur lors de la sauvegarde des données.', { autoClose: 2000 });
     }
   },
   remove: key => {
     try {
       localStorage.removeItem(key);
-      console.log(`Removed ${key} from localStorage`);
     } catch (error) {
       console.error(`Error removing ${key} from localStorage:`, error);
-      toast.error('Erreur lors de la suppression des données.', { autoClose: 2000 });
     }
   },
   getCart: tableNumber => {
-    const cart = storage.get(`cart_${tableNumber}`) || [];
-    console.log(`Panier chargé depuis localStorage pour table ${tableNumber}:`, cart);
-    return cart;
+    return storage.get(`cart_${tableNumber}`) || [];
   },
   updateCart: (newCart, tableNumber) => {
     storage.set(`cart_${tableNumber}`, newCart);
-    console.log(`Panier mis à jour dans localStorage pour table ${tableNumber}:`, newCart);
   },
   clearCart: tableNumber => {
     storage.set(`cart_${tableNumber}`, []);
-    console.log(`Panier vidé pour table ${tableNumber}`);
   },
   clearBillData: tableNumber => {
     storage.remove(`cart_${tableNumber}`);
     storage.remove('tableNumber');
-    console.log(`Bill data and table number cleared for table ${tableNumber}`);
   },
 };
 
 export default function Panier() {
   const navigate = useNavigate();
   const [tableNumber, setTableNumber] = useState(() => {
-    const num = storage.get('tableNumber') || '0';
-    console.log('Initial tableNumber:', num);
-    return num;
+    return storage.get('tableNumber') || '0';
   });
   const [cart, setCart] = useState(() => {
-    const initialCart = storage.getCart(tableNumber);
-    console.log('Initial cart:', initialCart);
-    return initialCart;
+    return storage.getCart(tableNumber);
   });
   const [commandePassee, setCommandePassee] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +76,6 @@ export default function Panier() {
   // Synchronize table number and cart
   useEffect(() => {
     const storedTableNumber = storage.get('tableNumber') || '0';
-    console.log('Syncing tableNumber:', storedTableNumber);
     if (storedTableNumber !== tableNumber) {
       setTableNumber(storedTableNumber);
       setCart(storage.getCart(storedTableNumber));
@@ -119,7 +104,7 @@ export default function Panier() {
   // Debounced quantity update
   const updateQuantity = useCallback((cartItemId, quantity) => {
     if (quantity < 1 || isNaN(quantity) || !Number.isInteger(quantity)) {
-      toast.error('Quantité invalide.', { autoClose: 2000 });
+      toast.error('Quantite invalide.', { autoClose: 2000 });
       return;
     }
     if (quantityTimeoutRef.current) {
@@ -130,7 +115,7 @@ export default function Panier() {
         const newCart = prevCart.map(item =>
           item.cartItemId === cartItemId ? { ...item, quantity } : item
         );
-        toast.info('Quantité mise à jour', { autoClose: 2000 });
+        toast.info('Quantite mise a jour', { autoClose: 2000 });
         setCommandePassee(false);
         return newCart;
       });
@@ -141,48 +126,46 @@ export default function Panier() {
   const removeFromCart = useCallback((cartItemId) => {
     setCart(prevCart => {
       const newCart = prevCart.filter(item => item.cartItemId !== cartItemId);
-      toast.info('Article supprimé du panier', { autoClose: 2000 });
+      toast.info('Article supprime du panier', { autoClose: 2000 });
       setCommandePassee(false);
       return newCart;
     });
-  }, []);
-
-  // Confirm modification
-  const confirmModification = useCallback((item) => {
-    toast.success(`Quantité pour ${item.name} modifiée à ${item.quantity}`, {
-      autoClose: 2000,
-    });
-    setCommandePassee(false);
   }, []);
 
   // Calculate cart total with Decimal.js
   const totalPrice = useMemo(() => {
     const total = cart.reduce((sum, item) => {
       const itemTotal = new Decimal(item.price || 0).times(item.quantity || 1);
-      console.log(`Item ${item.name} total: ${itemTotal}`);
       return sum.plus(itemTotal);
     }, new Decimal(0));
-    console.log('Total cart price:', total.toNumber());
     return total.toNumber();
   }, [cart]);
 
-  // Place order
+  // Place order - sends to backend API
   const passerCommande = useCallback(async () => {
     if (cart.length === 0) {
       toast.error('Votre panier est vide.', { autoClose: 2000 });
       return;
     }
     if (!tableNumber || tableNumber === '0') {
-      toast.error('Numéro de table non défini.', { autoClose: 2000 });
+      toast.error('Numero de table non defini.', { autoClose: 2000 });
       navigate('/client/menu');
       return;
     }
     setIsLoading(true);
     try {
-      await postOrder({ tableNumber, items: cart.map(item => ({ menuItem: item._id, quantity: item.quantity })) });
+      await postOrder({
+        tableNumber,
+        items: cart.map(item => ({
+          menuItem: item._id || item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+      });
       setCart([]);
-      storage.clearCart(tableNumber); // Vider le panier dans localStorage
-      toast.success('Commande passée avec succès ! Vous pouvez ajouter d’autres articles.', { autoClose: 2000 });
+      storage.clearCart(tableNumber);
+      toast.success('Commande envoyee avec succes !', { autoClose: 2000 });
       setCommandePassee(true);
     } catch (error) {
       console.error('Error saving order:', error);
@@ -195,7 +178,7 @@ export default function Panier() {
   // Add another order
   const ajouterAutreCommande = useCallback(() => {
     if (tableNumber === '0') {
-      toast.error('Numéro de table non défini. Veuillez sélectionner une table.', { autoClose: 2000 });
+      toast.error('Veuillez selectionner une table.', { autoClose: 2000 });
       navigate('/client/menu');
       return;
     }
@@ -206,12 +189,12 @@ export default function Panier() {
   // Return to categories
   const retourCategories = useCallback(() => {
     if (tableNumber === '0') {
-      toast.error('Veuillez d’abord sélectionner un numéro de table.', { autoClose: 2000 });
+      toast.error('Veuillez selectionner un numero de table.', { autoClose: 2000 });
       navigate('/client/menu');
       return;
     }
     if (cart.length > 0 && !commandePassee) {
-      if (!window.confirm('Vous avez des articles non commandés. Voulez-vous retourner aux catégories ?')) {
+      if (!window.confirm('Vous avez des articles non commandes. Voulez-vous retourner aux categories ?')) {
         return;
       }
     }
@@ -220,12 +203,12 @@ export default function Panier() {
 
   // Clear all data
   const clearAllData = useCallback(() => {
-    if (window.confirm('Êtes-vous sûr de vouloir effacer toutes les données de la table et du panier ?')) {
+    if (window.confirm('Effacer toutes les donnees de la table et du panier ?')) {
       storage.clearBillData(tableNumber);
       setTableNumber('0');
       setCart([]);
       setCommandePassee(false);
-      toast.info('Données effacées.', { autoClose: 2000 });
+      toast.info('Donnees effacees.', { autoClose: 2000 });
       navigate('/client/menu');
     }
   }, [tableNumber, navigate]);
@@ -245,11 +228,13 @@ export default function Panier() {
           onChange={(e) => updateQuantity(item.cartItemId, parseInt(e.target.value))}
           className={styles.quantityInput}
           disabled={commandePassee}
+          aria-label={`Quantite de ${item.name}`}
         />
         <button
           onClick={() => removeFromCart(item.cartItemId)}
           className={styles.removeButton}
           disabled={commandePassee}
+          aria-label={`Supprimer ${item.name}`}
         >
           Supprimer
         </button>
@@ -272,7 +257,7 @@ export default function Panier() {
 
         {tableNumber === '0' ? (
           <div className={styles.emptyCart}>
-            <p>Veuillez d'abord sélectionner un numéro de table sur la page du menu.</p>
+            <p>Veuillez selectionner un numero de table sur la page du menu.</p>
             <button onClick={() => navigate('/client/menu')} className={styles.backToMenuButton}>
               Aller au Menu
             </button>
@@ -286,7 +271,7 @@ export default function Panier() {
           </div>
         ) : (
           <>
-            <p className={styles.tableNumber}>Table N°: {tableNumber}</p>
+            <p className={styles.tableNumber}>Table N : {tableNumber}</p>
             <div className={styles.cartItems}>
               {cart.map((item) => (
                 <CartItem key={item.cartItemId} item={item} />
@@ -310,7 +295,7 @@ export default function Panier() {
                   Ajouter une autre commande
                 </button>
                 <button onClick={retourCategories} className={styles.backToCategoriesButton}>
-                  Retour aux Catégories
+                  Retour aux Categories
                 </button>
               </div>
             )}
