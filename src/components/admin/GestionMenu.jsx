@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '../../services/api';
 import styles from './GestionMenu.module.css';
 
 export default function GestionMenu() {
@@ -14,31 +15,22 @@ export default function GestionMenu() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Point all requests to the correct endpoint
-  const API_URL = 'https://backendmenu-3.onrender.com/api/menu';
-
   useEffect(() => {
-    const fetchMenu = async () => {
+    const fetchMenuData = async () => {
       setLoading(true);
       try {
-        const res = await fetch(API_URL);
-        if (!res.ok) {
-          throw new Error(`Erreur réseau: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        console.log('Raw API response:', data); // Debugging
-        // Handle different response structures
+        const res = await getMenu();
+        const data = res.data;
         let menuData = [];
         if (Array.isArray(data)) {
           menuData = data;
         } else if (data && Array.isArray(data.data)) {
-          menuData = data.data; // Handle { data: [...] } structure
+          menuData = data.data;
         } else {
-          throw new Error('Réponse API invalide: les données ne sont pas un tableau');
+          throw new Error('Format de donnees inattendu');
         }
-        // Map _id → id to normalize
         const normalizedData = menuData.map((item) => ({
-          id: item._id || item.id || `temp-${Math.random().toString(36).substr(2, 9)}`, // Fallback ID
+          id: item._id || item.id || `temp-${Math.random().toString(36).substr(2, 9)}`,
           name: item.name || '',
           price: item.price || 0,
           description: item.description || '',
@@ -47,14 +39,14 @@ export default function GestionMenu() {
         }));
         setMenu(normalizedData);
       } catch (err) {
-        console.error('Erreur chargement menu:', err.message, err.stack);
+        console.error('Erreur chargement menu:', err.message);
         setError(`Erreur lors du chargement du menu: ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMenu();
+    fetchMenuData();
   }, []);
 
   const handleChange = (e) => {
@@ -93,20 +85,9 @@ export default function GestionMenu() {
 
     try {
       if (editIndex !== null) {
-        // Update existing item
         const itemToUpdate = menu[editIndex];
-        const response = await fetch(`${API_URL}/${itemToUpdate.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || `Erreur lors de la mise à jour: ${response.status}`
-          );
-        }
-        const updatedItem = await response.json();
+        const response = await updateMenuItem(itemToUpdate.id, payload);
+        const updatedItem = response.data;
         const normalizedUpdatedItem = {
           id: updatedItem._id || updatedItem.id,
           name: updatedItem.name,
@@ -120,19 +101,8 @@ export default function GestionMenu() {
         setMenu(updatedMenu);
         setEditIndex(null);
       } else {
-        // Create new item
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || `Erreur lors de l'ajout: ${response.status}`
-          );
-        }
-        const newItem = await response.json();
+        const response = await addMenuItem(payload);
+        const newItem = response.data;
         const normalizedNewItem = {
           id: newItem._id || newItem.id,
           name: newItem.name,
@@ -163,15 +133,7 @@ export default function GestionMenu() {
     try {
       const itemToDelete = menu[index];
       if (!itemToDelete.id) throw new Error('ID manquant');
-      const response = await fetch(`${API_URL}/${itemToDelete.id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Erreur lors de la suppression: ${response.status}`
-        );
-      }
+      await deleteMenuItem(itemToDelete.id);
       const updated = [...menu];
       updated.splice(index, 1);
       setMenu(updated);

@@ -1,14 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import styles from './ListeCommandes.module.css';
-import {
-  FaSort, FaFilter, FaFileExport, FaTrash, FaEdit, FaSync,
-  FaTable, FaCalendarAlt, FaSearch, FaInfoCircle, FaReceipt,
-  FaChevronDown, FaChevronUp, FaStore, FaUser, FaMoneyBillWave,
-  FaPrint, FaCalculator
-} from 'react-icons/fa';
+import { FaSync } from 'react-icons/fa';
+import api from '../../services/api';
 
 // Utility function to calculate total from items
 const calculateCommandTotal = (items) => {
@@ -62,11 +56,7 @@ const useBills = (showNotification) => {
   const fetchBills = useCallback(async () => {
     try {
       setIsLoading(true);
-      const apiUrl = import.meta.env.VITE_API_URL;
-      if (!apiUrl) {
-          throw new Error("VITE_API_URL is not defined");
-      }
-      const response = await fetch(`${apiUrl}/api/orders`);
+      const response = await fetch(`${api.defaults.baseURL}/api/orders`);
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
@@ -104,13 +94,7 @@ const useBills = (showNotification) => {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL;
-    if (!wsUrl) {
-        console.error("VITE_WS_URL is not defined");
-        setWsError("L'URL WebSocket n'est pas configurée.");
-        showNotification("L'URL WebSocket n'est pas configurée.", 'error');
-        return;
-    }
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://backendmenu-3.onrender.com/ws';
 
     let ws;
     const connectWebSocket = () => {
