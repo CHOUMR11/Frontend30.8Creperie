@@ -44,15 +44,28 @@ export default function ListeCommandes() {
       setError(null);
       const response = await getOrders();
       const data = response.data;
+      console.log("[v0] getOrders() raw response.data:", JSON.stringify(data).slice(0, 2000));
+      console.log("[v0] typeof data:", typeof data, "isArray:", Array.isArray(data));
 
       // Handle different response formats
       let rawOrders = [];
       if (Array.isArray(data)) {
         rawOrders = data;
+        console.log("[v0] data is array, length:", data.length);
       } else if (data && Array.isArray(data.data)) {
         rawOrders = data.data;
+        console.log("[v0] data.data is array, length:", data.data.length);
       } else if (data && Array.isArray(data.orders)) {
         rawOrders = data.orders;
+        console.log("[v0] data.orders is array, length:", data.orders.length);
+      } else {
+        console.log("[v0] Unknown data format, keys:", data ? Object.keys(data) : 'null');
+      }
+
+      if (rawOrders.length > 0) {
+        console.log("[v0] First raw order sample:", JSON.stringify(rawOrders[0]).slice(0, 1000));
+      } else {
+        console.log("[v0] rawOrders is empty");
       }
 
       // Normalize orders

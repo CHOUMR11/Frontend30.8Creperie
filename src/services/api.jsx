@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://backendmenu-3.onrender.com';
+console.log("[v0] API baseURL:", BASE_URL);
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://backendmenu-3.onrender.com'
+  baseURL: BASE_URL,
 });
 
 // ---------- MENU ----------
