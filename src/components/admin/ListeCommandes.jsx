@@ -96,7 +96,7 @@ export default function ListeCommandes() {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log('[v0] WebSocket connecte');
+
           setWsConnected(true);
           // Fetch fresh data when WS connects
           fetchOrders();
@@ -105,7 +105,7 @@ export default function ListeCommandes() {
         ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('[v0] WS message recu:', message.type);
+
 
             if (message.type === 'orders' && Array.isArray(message.data)) {
               // The server pushes updated orders
@@ -127,22 +127,22 @@ export default function ListeCommandes() {
               fetchOrders();
             }
           } catch (parseErr) {
-            console.error('[v0] Erreur parsing WS message:', parseErr);
+            console.error('Erreur parsing WS message:', parseErr);
           }
         };
 
         ws.onclose = () => {
-          console.log('[v0] WebSocket ferme, reconnexion dans 5s...');
+
           setWsConnected(false);
           reconnectTimerRef.current = setTimeout(connectWebSocket, 5000);
         };
 
         ws.onerror = (err) => {
-          console.error('[v0] WebSocket erreur:', err);
+          console.error('WebSocket erreur:', err);
           setWsConnected(false);
         };
       } catch (err) {
-        console.error('[v0] Erreur creation WebSocket:', err);
+        console.error('Erreur creation WebSocket:', err);
         setWsConnected(false);
         reconnectTimerRef.current = setTimeout(connectWebSocket, 5000);
       }
