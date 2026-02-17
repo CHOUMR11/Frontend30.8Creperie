@@ -87,7 +87,7 @@ export default function ListeCommandes() {
       setOrders(normalized);
     } catch (err) {
       console.error('Erreur chargement commandes:', err);
-      setError('Impossible de charger les commandes. Verifiez la connexion au serveur.');
+      setError('Impossible de charger les commandes. Le serveur est peut-etre en cours de demarrage (30-60s). Cliquez sur Actualiser.');
     } finally {
       setIsLoading(false);
     }
